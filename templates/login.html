@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Login</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #f4f4f4;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            margin: 0;
+        }
+        .login-container {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 8px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            text-align: center;
+            max-width: 400px;
+            width: 100%; /* Ensures the container is responsive */
+        }
+        .login-container img {
+            height: 80px;
+            margin-bottom: 20px;
+        }
+        .login-container input[type="text"],
+        .login-container input[type="password"],
+        .login-container button {
+            width: 100%; /* Make all inputs and buttons the same width */
+            padding: 12px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            box-sizing: border-box; /* Ensure padding and width are consistent */
+        }
+        .login-container button {
+            background-color: #FF7043; /* Orange color */
+            color: white;
+            font-size: 16px;
+            border: none;
+            cursor: pointer;
+        }
+        .login-container button:hover {
+            background-color: #FF5722; /* Slightly darker on hover */
+        }
+        .error-message {
+            background-color: #ffeeba;
+            color: #856404;
+            padding: 10px;
+            border: 1px solid #ffeeba;
+            border-radius: 4px;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+        .login-container p {
+            color: #666;
+            font-size: 14px;
+            margin-top: 10px;
+        }
+        .copyright {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            font-size: 14px;
+            color: #666;
+        }
+    </style>
+</head>
+<body>
+    <div class="login-container">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        
+        {% if error %}
+        <div class="error-message">{{ error }}</div>
+        {% endif %}
+        
+        <form method="POST" action="/">
+            <input type="text" name="username" placeholder="Username" required>
+            <input type="password" name="password" placeholder="Password" required>
+            <button type="submit">Log in</button>
+        </form>
+        <p>Contact Your Local Expert to Reset Your Password</p>
+    </div>
+    <div class="copyright">
+        &copy; 2024 AccuQuote, LLC.
+    </div>
+</body>
+</html>
+
+
+

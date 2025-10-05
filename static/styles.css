@@ -1,0 +1,322 @@
+/* Add this to your existing styles.css file */
+
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background-color: #ffffff;
+    font-size: 14px;
+}
+
+.container {
+    max-width: 2000px;
+    margin: 0 auto;
+    padding: 20px;
+}
+
+.large-logo {
+    width: 800px;
+    display: block;
+    margin: 0 auto;
+}
+
+h1 {
+    background-color: #ffffff;
+    padding: 10px;
+}
+
+.upload-container {
+    margin: 20px 0;
+}
+
+.upload-container form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+#file {
+    margin-bottom: 10px;
+    width: 200px;
+    padding: 10px;
+}
+
+.btn {
+    display: block;
+    width: 200px;
+    padding: 10px;
+    margin: 10px 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+.upload-btn {
+    background-color: #007bff;
+    color: #ffffff;
+}
+
+.reset-btn {
+    background-color: #666666;
+    color: white;
+}
+
+.download-btn {
+    background-color: #4CAF50;
+    color: white;
+    margin: 20px 0;
+}
+
+.tables-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.table-container {
+    margin: 20px 0;
+    width: 100%;
+    overflow-x: auto;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: auto;
+}
+
+th, td {
+    border: 1px solid #ddd;
+    padding: 8px;
+    text-align: left;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 200px;
+}
+
+th.line-number, td.line-number,
+th.prediction, td.prediction,
+th.win-probability, td.win-probability,
+th.importance, td.importance {
+    max-width: 120px;
+}
+
+th {
+    background-color: #f2f2f2;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.download-container {
+    display: flex;
+    justify-content: center;
+}
+
+.color-circle {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-left: 10px;
+    vertical-align: middle;
+}
+
+form#quoteForm {
+    display: flex;
+    flex-direction: column;
+    align-items: center
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.form-group {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+}
+
+form#quoteForm label {
+    width: 300px;
+    text-align: left;
+    margin-bottom: 5px;
+}
+
+form#quoteForm input {
+    width: 300px;
+    padding: 5px;
+    margin-bottom: 10px;
+}
+
+.select-container {
+    max-width: 300px;
+    width: 100%;
+    overflow: hidden;
+}
+
+.select-container select {
+    width: 100%;
+    padding: 5px;
+    margin-bottom: 10px;
+    box-sizing: border-box;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.select-container select option {
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+form#quoteForm button {
+    width: 200px;
+    padding: 10px;
+    margin-top: 20px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    background-color: #007bff;
+    color: white;
+}
+
+.result-container {
+    margin-top: 20px;
+    text-align: center;
+}
+
+.result {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.result-text {
+    font-size: 24px;
+    margin-left: 10px;
+}
+
+.circle {
+    display: inline-block;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 10px;
+    vertical-align: middle;
+}
+
+.continue-container {
+    display: flex;
+    justify-content: center;
+}
+
+.btn-container {
+    display: flex;
+    justify-content: center;
+    gap: 20px;
+}
+
+form#quoteForm .clear-btn {
+    background-color: #666666; /* Gray color for clear button */
+    color: white;
+    width: 200px;
+    padding: 10px;
+}
+
+/* Navbar styling */
+.navbar {
+    width: 100%;
+    height: 50px;
+    background-color: #333;
+    display: flex;
+    align-items: center;
+    padding: 0 20px;
+}
+
+.navbar-logo img {
+    height: 40px; /* Adjust the height of the logo */
+    margin-right: 20px;
+}
+
+.navbar-links {
+    display: flex;
+    list-style-type: none;
+    margin: 0;
+    padding: 0;
+}
+
+.navbar-links li {
+    margin: 0 20px;
+}
+
+.navbar-links a {
+    color: white;
+    text-decoration: none;
+    font-size: 16px;
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

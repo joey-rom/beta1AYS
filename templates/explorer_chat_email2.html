@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Explorer</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root { --bg:#f6f6f7; --card:#fff; --text:#111; --muted:#666; --accent:#4CAF50; --border:#e6e6e6;
+            --docrow-bg:#f9fbff; --docrow-border:#d6e6ff; --projrow-hover:#eef8f0; }
+    * { box-sizing: border-box; }
+    body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background:var(--bg); color:var(--text); }
+    .navbar { background:#333; color:#fff; padding:10px; display:flex; gap:16px; align-items:center; position:sticky; top:0; z-index:10; }
+    .navbar img { height:36px; }
+    .navbar a { color:#fff; text-decoration:none; opacity:.95; }
+    .navbar a:hover { text-decoration:underline; }
+
+    .wrap { display:grid; grid-template-columns: 360px 1fr; height: calc(100vh - 56px); }
+    .sidebar { border-right:1px solid var(--border); overflow:auto; background:var(--card); }
+    .main { overflow:auto; padding:16px; }
+
+    .search { padding:12px; border-bottom:1px solid var(--border); }
+    .search input { width:100%; padding:10px 12px; border:1px solid var(--border); border-radius:8px; }
+
+    .proj { padding:10px 14px; border-bottom:1px solid var(--border); cursor:pointer; display:flex; align-items:flex-start; gap:8px; }
+    .proj .caret { width:18px; text-align:center; color:#999; user-select:none; }
+    .proj .name { font-weight:700; }
+    .proj .meta { color:var(--muted); font-size:.9rem; margin-top:2px; }
+    .proj:hover { background: var(--projrow-hover); }
+
+    .docs { background:#fafafa; }
+    .doc { display:flex; justify-content:space-between; align-items:center; gap:8px; padding:8px 28px; border-left:4px solid var(--docrow-border); border-bottom:1px dashed #eee; cursor:pointer; background:var(--docrow-bg); }
+    .doc .title { font-weight:600; }
+    .doc:hover { filter: brightness(0.98); }
+    .chip { display:inline-block; font-size:.75rem; padding:2px 8px; border-radius:999px; background:#eef2f7; color:#345; }
+
+    .pane { max-width: 980px; margin: 0 auto; }
+    .email { background:var(--card); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+    .email-head { padding:14px 16px; border-bottom:1px solid var(--border); }
+    .subject { font-size:1.15rem; font-weight:800; margin-bottom:6px; }
+    .envelope { font-size:.94rem; color:#334; display:flex; flex-wrap:wrap; gap:10px; }
+    .envelope .line span { color:#666; }
+    .attachments { padding:10px 16px; border-bottom:1px solid var(--border); display:flex; flex-wrap:wrap; gap:8px; }
+    .att { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; border:1px solid var(--border); border-radius:10px; text-decoration:none; color:#124; background:#fff; }
+    .att:hover { border-color:#ccd; }
+    .att .icon { font-size:1rem; }
+    .att .name { font-size:.92rem; }
+    .email-body { min-height: 64vh; }
+    .email-body iframe { width:100%; height:70vh; border:0; }
+    .empty { color:#777; text-align:center; margin-top:40px; }
+  /* Orange headers for tables on the explorer page */
+  table thead th {
+    background: #ff8c00;
+    color: #fff;
+  }
+
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+    <a href="{{ url_for('start_project') }}">Start Project</a>
+    <a href="{{ url_for('explorer_page') }}">Explorer</a>
+    <a href="{{ url_for('terms') }}">Search Terms</a>
+    <a href="{{ url_for('upload_file') }}">Spec Analysis</a>
+    <a href="{{ url_for('summarize_pdf') }}">Summary</a>
+    <!--<a href="{{ url_for('view_dashboard') }}">API Dashboard</a>-->
+  </div>
+
+  <div class="wrap">
+    <aside class="sidebar">
+      <div class="search"><input id="filter" type="text" placeholder="Search projects…"></div>
+      <div id="projList"></div>
+    </aside>
+
+    <main class="main">
+      <div class="pane">
+        <div id="empty" class="empty">Select a project, then a document to view the email and attachments.</div>
+        <div id="emailBox" class="email" style="display:none;">
+          <div class="email-head">
+            <div id="subject" class="subject">Subject</div>
+            <div class="envelope">
+              <div class="line"><span>From:</span> <strong id="fromName">AYS Reports</strong> &lt;<span id="fromEmail">noreply@areyouspecified.com</span>&gt;</div>
+              <div class="line"><span>To:</span> <span id="toEmail"></span></div>
+              <div class="line"><span>Date:</span> <span id="mailDate"></span></div>
+            </div>
+          </div>
+          <div id="attachRow" class="attachments" style="display:none;"></div>
+          <div class="email-body"><iframe id="previewFrame" loading="lazy"></iframe></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+<script>
+  const projList = document.getElementById('projList');
+  const filter = document.getElementById('filter');
+  const empty = document.getElementById('empty');
+  const emailBox = document.getElementById('emailBox');
+  const subjectEl = document.getElementById('subject');
+  const fromNameEl = document.getElementById('fromName');
+  const fromEmailEl = document.getElementById('fromEmail');
+  const toEmailEl = document.getElementById('toEmail');
+  const mailDateEl = document.getElementById('mailDate');
+  const attachRow = document.getElementById('attachRow');
+  const previewFrame = document.getElementById('previewFrame');
+
+  let projects = [];
+  let expanded = new Set();
+
+  const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+
+  async function loadProjects(){
+    const r = await fetch('/api/explorer/projects');
+    projects = await r.json();
+    renderProjects();
+  }
+
+  function renderProjects(){
+    const q = filter.value.trim().toLowerCase();
+
+    // ✅ client-side safety: ensure newest first by sort_key (even if API already sorted)
+    const items = [...projects].sort((a,b)=> (b.sort_key||0)-(a.sort_key||0));
+
+    projList.innerHTML = '';
+    items
+      .filter(p => !q || (p.project_name||'').toLowerCase().includes(q) || (p.email||'').toLowerCase().includes(q))
+      .forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'proj'; row.dataset.pid = p.project_id;
+        row.innerHTML = `
+          <div class="caret">${expanded.has(p.project_id) ? '▾' : '▸'}</div>
+          <div><div class="name">${esc(p.project_name)}</div><div class="meta">${esc(p.date)} • ${esc(p.email)}</div></div>
+        `;
+        row.addEventListener('click', () => toggleProject(p.project_id));
+        projList.appendChild(row);
+        if (expanded.has(p.project_id)) {
+          const holder = document.createElement('div');
+          holder.className = 'docs'; holder.id = `docs-${p.project_id}`;
+          holder.innerHTML = `<div class="doc"><div class="title">Loading…</div></div>`;
+          projList.appendChild(holder);
+          fetchDocs(p.project_id);
+        }
+      });
+  }
+
+  function toggleProject(pid){
+    if (expanded.has(pid)) { expanded.delete(pid); const ex = document.getElementById(`docs-${pid}`); if (ex) ex.remove(); }
+    else { expanded.add(pid); }
+    renderProjects();
+  }
+
+  async function fetchDocs(pid){
+    const r = await fetch(`/api/explorer/${encodeURIComponent(pid)}/docs`);
+    const data = await r.json();
+    const holder = document.getElementById(`docs-${pid}`); if (!holder) return;
+    holder.innerHTML = '';
+    if (!data.docs || !data.docs.length){ holder.innerHTML = `<div class="doc"><div class="title">No documents</div></div>`; return; }
+    data.docs.forEach(d => {
+      const row = document.createElement('div'); row.className = 'doc';
+      row.innerHTML = `<div class="title">${esc(d.doc_folder)}</div><div><span class="chip">attachments</span></div>`;
+      row.addEventListener('click', () => showEmail(data.project, d));
+      holder.appendChild(row);
+    });
+  }
+
+  function iconFor(ext){
+    switch((ext||'').toLowerCase()){ case 'zip':return '🧷'; case 'xlsx':return '📊'; case 'pdf':return '📄'; default:return '📎'; }
+  }
+
+  function showEmail(project, doc){
+    empty.style.display = 'none'; emailBox.style.display = '';
+    subjectEl.textContent = doc.subject || `${project.project_name} — ${doc.doc_folder}`;
+    fromNameEl.textContent = 'AYS Reports'; fromEmailEl.textContent = 'noreply@areyouspecified.com';
+    toEmailEl.textContent = project.email || (doc.email_meta && doc.email_meta.to_email) || '';
+    mailDateEl.textContent = project.date || (doc.email_meta && doc.email_meta.date) || '';
+
+    // attachments (download in new tab)
+    attachRow.innerHTML = '';
+    const atts = (doc.attachments || []).filter(a => a && a.href);
+    if (atts.length){
+      attachRow.style.display = 'flex';
+      atts.forEach(a => {
+        const el = document.createElement('a'); el.className = 'att'; el.href = a.href; el.target = '_blank'; el.rel='noopener';
+        el.innerHTML = `<span class="icon">${iconFor(a.ext)}</span><span class="name">${esc(a.label)}</span>`;
+        attachRow.appendChild(el);
+      });
+    } else {
+      attachRow.style.display = 'none';
+    }
+
+    // inline preview (no download); prefer HTML, else PDF
+    const src = (doc.preview && (doc.preview.html || doc.preview.pdf)) || 'about:blank';
+    previewFrame.src = src;
+  }
+
+  filter.addEventListener('input', renderProjects);
+  loadProjects();
+</script>
+</body>
+</html>
+

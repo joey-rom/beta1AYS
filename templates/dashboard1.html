@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AYS Dashboard</title>
+    <link rel="stylesheet" type="text/css" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <script src="https://code.jquery.com/jquery-3.7.0.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f4f4f4; }
+        .navbar { width:100%; background:#333; color:#fff; padding:10px; display:flex; align-items:center; position:fixed; top:0; left:0; }
+        .navbar img { height:40px; margin-right:10px; }
+        .navbar a { color:#fff; text-decoration:none; margin-left:20px; }
+        .container { max-width:1300px; margin:80px auto; padding:15px; background:#fff; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,0.1); text-align:center; }
+        table { width:100%; border-collapse:collapse; margin-top:20px; }
+        th, td { border:1px solid #ddd; padding:8px; text-align:left; }
+        th { background:#F4A460; color:#fff; }
+        .btn-download { background:#4CAF50; color:#fff; padding:10px 20px; margin-bottom:20px; text-decoration:none; display:inline-block; border-radius:5px; }
+        .btn-download:hover { background:#45a049; }
+        .top-wrapper { text-align:left; margin-bottom:20px; }
+        tfoot input { width:100%; box-sizing:border-box; }
+        .bottom-wrapper { display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding:0 20px; }
+        #dashboardTable { width:100% !important; }
+        .filter-row input { width:120px; padding:4px; font-size:12px; margin-right:5px; margin-bottom:10px; }
+        td, th { white-space: normal !important; word-wrap: break-word; }
+        #dashboardTable_wrapper { overflow-x:auto; }
+    </style>
+</head>
+<body>
+    <div class="navbar">
+        <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+        <a href="{{ url_for('start_project') }}">Start Project</a>
+        <a href="{{ url_for('explorer_page') }}">Explorer</a>
+        <a href="{{ url_for('terms') }}">Search Terms</a>
+        <a href="{{ url_for('upload_file') }}">Spec Analysis</a>
+        <a href="{{ url_for('summarize_pdf') }}">Summary</a>
+        <!--<a href="{{ url_for('view_dashboard') }}">API Dashboard</a>-->
+        
+    </div>
+
+    <div class="container">
+        <h1>AYS Dashboard</h1>
+        <a href="{{ url_for('download_dashboard_excel') }}" class="btn-download">Download Excel</a>
+
+        <div class="filter-row-container"></div>
+
+        <table id="dashboardTable" class="display nowrap" style="width:100%">
+            <thead>
+              <tr>
+                {% for col in table_columns %}
+                  <th>{{ col }}</th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for row in table_data %}
+              <tr>
+                {% for col in table_columns %}
+                  {% set val = row[col] %}
+                  {% if col == 'Download URL' and val %}
+                    <td>
+                      <a class="btn-download" href="{{ val }}" target="_blank" rel="noopener">
+                        Download ZIP
+                      </a>
+                    </td>
+                  {% else %}
+                    <td>{{ val }}</td>
+                  {% endif %}
+                {% endfor %}
+              </tr>
+              {% endfor %}
+            </tbody>
+
+
+        </table>
+    </div>
+
+    <div style="display:flex; justify-content:center;">
+        <div style="width:1000px;">
+            <canvas id="recommendationChart" height="500"></canvas>
+        </div>
+    </div>
+
+    <script>
+    $(document).ready(function () {
+        // Build a header index map so we can target columns by name
+        const headerMap = {};
+        $('#dashboardTable thead th').each(function(i){
+            headerMap[$(this).text().trim()] = i;
+        });
+
+        const idxDate   = headerMap['Date'];
+        const idxPid    = headerMap['Project ID'];
+        const idxPname  = headerMap['Project Name'];
+        const idxEmail  = headerMap['Email'];
+        const idxTotal  = headerMap['Total Docs'];
+        const idxStatus = headerMap['Status'];
+
+        const table = $('#dashboardTable').DataTable({
+            dom: 't<"bottom-wrapper d-flex justify-content-center align-items-center mt-3"<"me-auto"p><"ms-auto"l>>',
+            pageLength: 10,
+            lengthMenu: [5, 10, 25, 50, 100],
+            scrollX: true,
+            order: (typeof idxDate === 'number') ? [[idxDate, 'desc']] : [],
+            columnDefs: [
+                ...(typeof idxDate === 'number'   ? [{ targets: idxDate,  width: '110px' }] : []),
+                ...(typeof idxPid === 'number'    ? [{ targets: idxPid,   width: '200px' }] : []),
+                ...(typeof idxPname === 'number'  ? [{ targets: idxPname, width: '260px' }] : []),
+                ...(typeof idxEmail === 'number'  ? [{ targets: idxEmail, width: '220px' }] : []),
+                ...(typeof idxTotal === 'number'  ? [{ targets: idxTotal, width: '110px' }] : []),
+                ...(typeof idxStatus === 'number' ? [{ targets: idxStatus, width: '160px', orderable: false }] : []),
+            ],
+            initComplete: function () {
+                const api = this.api();
+                const tableHeaderCells = $('#dashboardTable thead th');
+
+                const filterRow = $('<div class="filter-row" style="display:flex; flex-wrap:wrap; margin-bottom:10px;"></div>');
+                tableHeaderCells.each(function (i) {
+                    const title = $(this).text().trim();
+                    const input = $(`<input type="text" class="column-filter" placeholder="Filter ${title}" data-column="${i}" />`).css({
+                        width: '140px', fontSize: '14px', padding: '6px',
+                        marginRight: '10px', marginBottom: '6px'
+                    });
+                    filterRow.append(input);
+                });
+                $(".filter-row-container").html(filterRow);
+
+                $('.column-filter').on('keyup change clear', function () {
+                    const colIndex = $(this).data('column');
+                    api.column(colIndex).search(this.value).draw();
+                });
+            }
+        });
+    });
+    </script>
+
+    <script>
+    // Chart: show the status buckets your backend provides (Processing / Complete / Other)
+    const ctx = document.getElementById('recommendationChart').getContext('2d');
+    new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels: {{ chart_labels | tojson }},
+            datasets: [{
+                label: 'Project Status Count',
+                data: {{ chart_values | tojson }},
+                backgroundColor: '#F58220',
+                borderColor: '#333',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { display: false } },
+            scales: {
+                x: { ticks: { maxRotation: 0, minRotation: 0 } },
+                y: { beginAtZero: true, ticks: { precision: 0 } }
+            }
+        }
+    });
+    </script>
+</body>
+</html>
+
+

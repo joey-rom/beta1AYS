@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Project Queue — Submit</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: Arial, sans-serif; background:#f4f4f4; margin:0; }
+    .navbar { background:#333; color:#fff; padding:10px; display:flex; align-items:center; position:fixed; top:0; left:0; width:100%; z-index:10; }
+    .navbar img { height:40px; margin-right:10px; }
+    .navbar a { color:#fff; text-decoration:none; margin-left:20px; }
+    .container { max-width:900px; margin:80px auto 40px; padding:20px; background:#fff; border-radius:8px; box-shadow:0 0 10px rgba(0,0,0,.1); }
+    h2 { margin:8px 0 0; }
+    label { display:block; margin-top:12px; font-weight:bold; }
+    input[type="text"], input[type="email"], input[type="file"] {
+      width:100%; padding:10px; margin-top:6px; border:1px solid #ccc; border-radius:4px;
+    }
+    .row { display:flex; gap:10px; align-items:center; }
+    .btn { display:inline-block; padding:10px 14px; border:0; border-radius:6px; cursor:pointer; }
+    .btn-primary { background:#4CAF50; color:#fff; }
+    .btn-primary:hover { background:#45a049; }
+    .btn-muted { background:#e9e9e9; }
+    .muted { color:#777; font-size:.9rem; }
+    .hidden { display:none; }
+    ul.simple { list-style:none; padding-left:0; margin:6px 0; }
+    ul.simple li { padding:6px 0; border-bottom:1px solid #eee; display:flex; justify-content:space-between; align-items:center; gap:10px; }
+    .card { border:1px solid #eee; border-radius:8px; padding:12px 14px; margin-top:10px; }
+  </style>
+</head>
+<body>
+
+  <div class="navbar">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+    <!--<a href="{{ url_for('start_project') }}">Start Project</a>-->
+    <!--<a href="{{ url_for('explorer_page') }}">Explorer</a>-->
+    <!--<a href="{{ url_for('terms') }}">Search Terms</a>-->
+    <!--<a href="{{ url_for('upload_file') }}">Spec Analysis</a>-->
+    <!--<a href="{{ url_for('summarize_pdf') }}">Summary</a>-->
+    <!--<a href="{{ url_for('view_dashboard') }}">API Dashboard</a>-->
+  </div>
+
+  <div class="container">
+    <h2>Submit a Project</h2>
+    <p class="muted">You can submit projects back-to-back — they’ll be queued and processed in the background.</p>
+
+    <form id="submitForm" enctype="multipart/form-data">
+      <label>Project Name</label>
+      <input type="text" name="Subject" id="subject" required>
+
+      <label>Your Email</label>
+      <input type="email" name="From" id="email" required>
+
+      <label>PDF Files</label>
+      <input type="file" name="files" id="files" accept=".pdf" multiple required>
+
+      <div class="row" style="margin-top:12px;">
+        <button class="btn btn-primary" type="submit">Submit Project</button>
+        <button class="btn btn-muted" type="button" id="resetBtn">Reset Form</button>
+      </div>
+
+      <div id="submitMsg" class="muted" style="margin-top:8px;"></div>
+    </form>
+
+    <div id="selectedFiles" class="card hidden">
+      <strong>Selected files</strong>
+      <ul id="fileList" class="simple"></ul>
+    </div>
+  </div>
+
+<script>
+  const form = document.getElementById('submitForm');
+  const filesInput = document.getElementById('files');
+  const fileList = document.getElementById('fileList');
+  const selectedFilesBox = document.getElementById('selectedFiles');
+  const submitMsg = document.getElementById('submitMsg');
+
+  // show selected files
+  filesInput.addEventListener('change', () => {
+    const files = Array.from(filesInput.files || []);
+    fileList.innerHTML = '';
+    if (files.length) {
+      selectedFilesBox.classList.remove('hidden');
+    } else {
+      selectedFilesBox.classList.add('hidden');
+    }
+    files.forEach(f => {
+      const li = document.createElement('li');
+      li.textContent = f.name;
+      fileList.appendChild(li);
+    });
+  });
+
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    form.reset();
+    fileList.innerHTML = '';
+    selectedFilesBox.classList.add('hidden');
+    submitMsg.textContent = '';
+  });
+
+  // submit a project -> /project-process (JSON)
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    submitMsg.textContent = 'Submitting…';
+
+    const fd = new FormData();
+    fd.append('Subject', document.getElementById('subject').value);
+    fd.append('From', document.getElementById('email').value);
+    Array.from(filesInput.files || []).forEach(f => fd.append('files', f));
+
+    try {
+      const res = await fetch('/project-process', {
+        method: 'POST',
+        body: fd,
+        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' }
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      // We don't need the payload here; just acknowledge and reset for rapid-fire
+      submitMsg.innerHTML = '✅ Project Started! Close this window and we will be right back with your processed documents.';
+      form.reset();
+      fileList.innerHTML = '';
+      selectedFilesBox.classList.add('hidden');
+    } catch (err) {
+      console.error(err);
+      submitMsg.textContent = '❌ Failed to submit project.';
+    }
+  });
+</script>
+
+</body>
+</html>
+
+
+
+
+
