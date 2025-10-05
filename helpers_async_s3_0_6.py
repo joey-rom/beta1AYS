@@ -52,7 +52,7 @@ def _global_job_lock():
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
-S3_BUCKET = os.getenv("S3_BUCKET", "ays-artifacts-prod")
+S3_BUCKET = os.getenv("S3_BUCKET", "ays-artifacts-beta1")
 S3_UPLOAD_PREFIX = os.getenv("S3_UPLOAD_PREFIX", "uploads")
 S3_RESULTS_PREFIX = os.getenv("S3_RESULTS_PREFIX", "results")
 
