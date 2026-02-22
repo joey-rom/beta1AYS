@@ -1,0 +1,1722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Dashboard</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root {
+      --bg:#f6f6f7;
+      --card:#fff;
+      --text:#111;
+      --muted:#666;
+      --accent:#4CAF50;
+      --border:#e6e6e6;
+      --docrow-bg:#f9fbff;
+      --docrow-border:#d6e6ff;
+      --projrow-hover:#eef8f0;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+    
+    .copyright{
+      position:fixed;
+      bottom:10px;
+      right:10px;
+      font-size:14px;
+      color:#666;
+    }
+    
+    .navbar{
+      background:#333;
+      color:#fff;
+      padding:10px 16px;
+      display:flex;
+      align-items:center;
+      gap:16px;
+      position:sticky;
+      top:0;
+      z-index:20; /* keep nav above content */
+    }
+    .navbar .nav-left{
+      display:flex;
+      align-items:center;
+      gap:16px;
+    }
+    .navbar .brand-logo{
+      height:52px;  /* bump this up/down if you want bigger/smaller logo */
+      width:auto;
+      display:block;
+    }
+    .navbar a,
+    .navbar button{
+      color:#fff;
+      text-decoration:none;
+      opacity:.95;
+      font-size:1rem;
+    }
+    .navbar a:hover,
+    .navbar button:hover{
+      text-decoration:none;
+    }
+    
+    /* dropdown groups */
+    .navbar .nav-group{
+      position:relative;
+    }
+    .navbar .nav-trigger{
+      background:none;
+      border:0;
+      cursor:pointer;
+      padding:6px 10px;
+      border-radius:999px;
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+    }
+    .navbar .nav-trigger:hover{
+      background:rgba(255,255,255,.12);
+    }
+    
+    /* the actual dropdown (this is the piece that, if not styled, looks like a white box) */
+    .navbar .dropdown{
+      position:absolute;
+      top:100%;
+      left:0;
+      margin-top:4px;
+      min-width:160px;
+      background:#222;
+      border-radius:8px;
+      padding:6px 0;
+      box-shadow:0 4px 12px rgba(0,0,0,.25);
+      display:none;           /* ⬅ key: hidden by default so it doesn’t sit over Start Project */
+      z-index:30;
+    }
+    .navbar .dropdown a{
+      display:block;
+      padding:6px 12px;
+      color:#fff;
+      white-space:nowrap;
+    }
+    .navbar .dropdown a:hover{
+      background:#444;
+    }
+    
+    .navbar .spacer{
+      flex:1;
+    }
+    
+    /* make sure Start Project always shows above anything weird */
+    .btn-primary {
+      background:#4CAF50;
+      border-radius:8px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.2);
+      position:relative;
+      z-index:40;
+    }
+    .btn-primary:hover { text-decoration:none; filter:brightness(1.05); }
+
+
+    .wrap {
+      display:grid;
+      grid-template-columns: 360px 1fr;
+      height: calc(100vh - 56px);
+    }
+    .sidebar {
+      border-right:1px solid var(--border);
+      overflow:auto;
+      background:var(--card);
+    }
+    .main { overflow:auto; padding:16px; }
+
+    .search {
+      padding:12px;
+      border-bottom:1px solid var(--border);
+    }
+    .search input {
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:8px;
+    }
+
+    .proj {
+      padding:10px 14px;
+      border-bottom:1px solid var(--border);
+      cursor:pointer;
+      display:flex;
+      align-items:flex-start;
+      gap:8px;
+    }
+    .proj .caret {
+      width:18px;
+      text-align:center;
+      color:#999;
+      user-select:none;
+    }
+    .proj .name { font-weight:700; }
+    .proj .meta {
+      color:var(--muted);
+      font-size:.9rem;
+      margin-top:2px;
+    }
+    .proj:hover { background: var(--projrow-hover); }
+
+    .docs { background:#fafafa; }
+
+    .doc {
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px 8px 28px;
+      border-left:4px solid var(--docrow-border);
+      border-bottom:1px dashed #eee;
+      background:var(--docrow-bg);
+    }
+    .doc-body {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      flex:1;
+      min-width:0;
+      cursor:pointer;
+    }
+    .doc .title {
+      font-weight:600;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+    .doc:hover { filter: brightness(0.98); }
+
+    .chip {
+      display:inline-block;
+      font-size:.75rem;
+      padding:2px 8px;
+      border-radius:999px;
+      background:#eef2f7;
+      color:#345;
+      white-space:nowrap;
+    }
+
+    .icon-btn {
+      background:none;
+      border:0;
+      cursor:pointer;
+      padding:4px;
+      border-radius:6px;
+      font-size:1rem;
+      line-height:1;
+      color:#777;
+    }
+    .icon-btn:hover {
+      background:#f1f1f1;
+      color:#b91c1c;
+    }
+
+    .bid-col {
+      flex:0 0 auto;
+    }
+    .bid-select {
+      font-size:.75rem;
+      padding:4px 6px;
+      border-radius:999px;
+      border:1px solid #ccd;
+      background:#fff;
+      cursor:pointer;
+    }
+
+    .pane { max-width: 980px; margin: 0 auto; }
+    .email {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+    }
+    .email-head {
+      padding:14px 16px;
+      border-bottom:1px solid var(--border);
+    }
+    .subject {
+      font-size:1.15rem;
+      font-weight:800;
+      margin-bottom:6px;
+    }
+    .envelope {
+      font-size:.94rem;
+      color:#334;
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+    .envelope .line span { color:#666; }
+
+    .attachments {
+      padding:10px 16px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      flex-wrap:wrap;
+      gap:8px;
+    }
+    .att {
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      padding:8px 12px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      text-decoration:none;
+      color:#124;
+      background:#fff;
+    }
+    .att:hover { border-color:#ccd; }
+    .att .icon { font-size:1rem; }
+    .att .name { font-size:.92rem; }
+
+    .email-body { min-height: 64vh; }
+    .email-body iframe {
+      width:100%;
+      height:70vh;
+      border:0;
+    }
+
+    .email-footer {
+      padding:12px 16px 16px;
+      border-top:1px solid var(--border);
+      background:#fafafa;
+      display:flex;
+      gap:12px;
+      justify-content:center;
+      flex-wrap:wrap;
+    }
+
+    .btn-secondary {
+      background:#2563eb;
+      color:#fff;
+      border-radius:999px;
+      padding:8px 18px;
+      border:0;
+      font-size:.9rem;
+      cursor:pointer;
+      box-shadow:0 1px 2px rgba(0,0,0,.08);
+    }
+    .btn-secondary:hover { filter:brightness(1.05); }
+
+    .empty {
+      color:#777;
+      text-align:center;
+      margin-top:40px;
+    }
+    table thead th { background:#ff8c00; color:#fff; }
+
+    .usage-stats {
+      display:flex;
+      flex-wrap:wrap;
+      gap:16px;
+      margin-bottom:16px;
+    }
+    .usage-card {
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:12px;
+      padding:10px 14px;
+      min-width:160px;
+    }
+    .usage-card .label {
+      font-size:.78rem;
+      color:var(--muted);
+      text-transform:uppercase;
+      letter-spacing:.04em;
+    }
+    .usage-card .value {
+      font-size:1.2rem;
+      font-weight:700;
+      margin-top:4px;
+    }
+
+    dialog::backdrop { background: rgba(0,0,0,.35); }
+    dialog {
+      border:0;
+      border-radius:14px;
+      padding:0;
+    }
+    #newProjectFrame,
+    #confirmSendFrame {
+      width:min(920px,90vw);
+      height:min(80vh,780px);
+      border:0;
+      display:block;
+    }
+
+    .dlg-bar {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      background:#fff;
+      border-top-left-radius:14px;
+      border-top-right-radius:14px;
+    }
+    .dlg-title {
+      font-weight:800;
+      font-size:1rem;
+    }
+    .close-btn {
+      background:#eee;
+      border:1px solid #ddd;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+    .close-btn:hover { filter:brightness(0.98); }
+
+    /* Project Details panel */
+    .meta-panel {
+      margin-top:12px;
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      background:#fffaf5;
+    }
+    .meta-header {
+      font-size:.9rem;
+      font-weight:700;
+      color:#b45309;
+      margin-bottom:8px;
+    }
+    .meta-row {
+      display:flex;
+      flex-direction:column;
+      gap:4px;
+      margin-bottom:8px;
+    }
+    .meta-row label {
+      font-size:.78rem;
+      font-weight:600;
+      color:#555;
+    }
+    .meta-row input,
+    .meta-row textarea {
+      font-size:.85rem;
+      padding:6px 8px;
+      border-radius:8px;
+      border:1px solid var(--border);
+      resize:vertical;
+    }
+    .meta-actions {
+      display:flex;
+      align-items:center;
+      gap:8px;
+      margin-top:4px;
+    }
+    #projMetaSaveBtn {
+      border-radius:999px;
+      padding:6px 14px;
+      font-size:.8rem;
+      border:0;
+      background:#4CAF50;
+      color:#fff;
+      cursor:pointer;
+    }
+    #projMetaSaveBtn:hover {
+      filter:brightness(1.05);
+    }
+    .meta-status {
+      font-size:.8rem;
+      color:#16a34a;
+    }
+    .meta-status.err {
+      color:#b91c1c;
+    }
+
+    /* Version pill */
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:.82rem;
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.18);
+      color:#fff;
+      white-space:nowrap;
+      opacity:.95;
+    }
+    
+    /* NEW: email summary/header + preview can be hidden in "project-only" mode */
+    .is-project-only #emailSummaryHeader { display:none; }
+    .is-project-only #attachRow { display:none !important; }
+    .is-project-only #emailContent { display:none; }
+  </style>
+</head>
+
+<!-- OPTIONAL: backend can inject version here too -->
+<body data-ays-version="{{ ays_version|default('') }}">
+
+  <div class="navbar">
+  <div class="nav-left">
+    <a href="{{ url_for('explorer_page') }}" class="brand-link">
+      <img
+        src="{{ url_for('static', filename='logo.png') }}"
+        alt="AreYouSpecified / Transformer"
+        class="brand-logo"
+      >
+    </a>
+
+    <div class="nav-group">
+      <button class="nav-trigger" type="button">AreYouSpecified ▾</button>
+      <div class="dropdown">
+        <a href="{{ url_for('explorer_page') }}">Dashboard</a>
+        <a href="{{ url_for('terms') }}">Terms</a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <button class="nav-trigger" type="button">Transformer ▾</button>
+      <div class="dropdown">
+        <a href="{{ url_for('config_page') }}">Transformer</a>
+      </div>
+    </div>
+  </div>
+
+  <span class="spacer"></span>
+  <span id="aysVersionPill" class="pill" title="AYS version">AYS v–</span>
+  <button class="btn-primary" onclick="openNewProject()">+ Start Project</button>
+</div>
+
+  <div class="wrap">
+    <aside class="sidebar">
+      <div class="search">
+        <input id="filter" type="text" placeholder="Search projects…">
+      </div>
+      <div id="projList"></div>
+    </aside>
+
+    <main class="main">
+      <div class="pane">
+
+        <div id="usageStats" class="usage-stats">
+          <div class="usage-card">
+            <div class="label">Total Submissions</div>
+            <div class="value" id="statSubmissions">–</div>
+          </div>
+          <div class="usage-card">
+            <div class="label">Pages Processed</div>
+            <div class="value" id="statPages">–</div>
+          </div>
+        </div>
+
+        <div id="empty" class="empty">
+          Select a project, then a document to view the email and attachments.
+        </div>
+
+        <div id="emailBox" class="email" style="display:none;">
+          <div class="email-head">
+
+            <!-- NEW: wrapper so we can hide email summary until a doc is clicked -->
+            <div id="emailSummaryHeader">
+              <div id="subject" class="subject">Subject</div>
+
+              <div class="envelope">
+                <div class="line">
+                  <span>From:</span>
+                  <strong id="fromName">AYS Reports</strong>
+                  &lt;<span id="fromEmail">noreply@areyouspecified.com</span>&gt;
+                </div>
+                <div class="line">
+                  <span>To:</span> <span id="toEmail"></span>
+                </div>
+                <div class="line">
+                  <span>Date:</span> <span id="mailDate"></span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Editable Project Details (one column) -->
+            <div id="projMetaPanel" class="meta-panel">
+              <div class="meta-header">Project Details</div>
+
+              <div class="meta-row">
+                <label for="projNameInput">Job / Project Name</label>
+                <input id="projNameInput" type="text" />
+              </div>
+
+              <div class="meta-row">
+                <label for="projEmailInput">Customer Email</label>
+                <input id="projEmailInput" type="email" />
+              </div>
+
+              <div class="meta-row">
+                <label for="projBidDateInput">Bid Date</label>
+                <!-- calendar picker -->
+                <input id="projBidDateInput" type="date" />
+              </div>
+
+              <div class="meta-row">
+                <label for="projDrawingDateInput">Drawing Date</label>
+                <!-- calendar picker -->
+                <input id="projDrawingDateInput" type="date" />
+              </div>
+
+              <div class="meta-row">
+                <label for="projAddressInput">Address</label>
+                <textarea id="projAddressInput"></textarea>
+              </div>
+
+              <div class="meta-row">
+                <label for="projEngineerInput">Engineer</label>
+                <input id="projEngineerInput" type="text" />
+              </div>
+
+              <div class="meta-row">
+                <label for="projGCInput">General Contractor</label>
+                <input id="projGCInput" type="text" />
+              </div>
+
+              <div class="meta-row">
+                <label for="projNotesInput">Notes</label>
+                <textarea id="projNotesInput"></textarea>
+              </div>
+
+              <div class="meta-actions">
+                <button id="projMetaSaveBtn" type="button">Save Project Details</button>
+                <span id="projMetaStatus" class="meta-status"></span>
+              </div>
+            </div>
+          </div>
+
+          <div id="attachRow" class="attachments" style="display:none;"></div>
+
+          <!-- NEW: wrapper so we can hide preview until a doc is clicked -->
+          <div id="emailContent" class="email-body">
+            <iframe id="previewFrame" loading="lazy"></iframe>
+          </div>
+
+          <div class="email-footer">
+            <button id="sendToAiBtn" class="btn-secondary" type="button">
+              Send to Accuquote
+            </button>
+
+            <button id="editProjectBtn" class="btn-secondary" type="button" style="background:#ff8c00;">
+              Upload New Docs
+            </button>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <!-- Start Project dialog -->
+  <dialog id="newProjectDlg" data-upload-url="{{ url_for('start_project', embed=1) }}">
+    <div class="dlg-bar">
+      <div class="dlg-title">Start Project</div>
+      <button type="button" class="close-btn" onclick="closeNewProject()">Close</button>
+    </div>
+    <iframe id="newProjectFrame" title="Start Project"></iframe>
+    <noscript>
+      <a href="{{ url_for('start_project', embed=1) }}" target="_blank" rel="noopener">
+        Open Start Project
+      </a>
+    </noscript>
+  </dialog>
+
+  <!-- Confirm / Send dialog -->
+  <dialog id="confirmSendDlg" data-base-url="{{ url_for('job_confirm_send') }}">
+    <div class="dlg-bar">
+      <div class="dlg-title">Review &amp; Send to ROM</div>
+      <button type="button" class="close-btn" onclick="closeConfirmSend()">Close</button>
+    </div>
+    <iframe id="confirmSendFrame" title="Confirm Send"></iframe>
+    <noscript>
+      <a href="{{ url_for('job_confirm_send') }}" target="_blank" rel="noopener">
+        Open Intent Form
+      </a>
+    </noscript>
+  </dialog>
+
+  <!-- Edit Project dialog -->
+  <dialog id="editProjectDlg">
+    <div class="dlg-bar">
+      <div class="dlg-title">Edit Project</div>
+      <button type="button" class="close-btn" onclick="closeEditProject()">Close</button>
+    </div>
+    <iframe id="editProjectFrame" title="Edit Project" style="width:min(920px,90vw); height:min(80vh,780px);"></iframe>
+  </dialog>
+  
+  <div class="copyright">
+    &copy; 2024 AccuQuote, LLC.
+  </div>
+
+<script>
+  const projList        = document.getElementById('projList');
+  const filter          = document.getElementById('filter');
+  const empty           = document.getElementById('empty');
+  const emailBox        = document.getElementById('emailBox');
+  const subjectEl       = document.getElementById('subject');
+  const fromNameEl      = document.getElementById('fromName');
+  const fromEmailEl     = document.getElementById('fromEmail');
+  const toEmailEl       = document.getElementById('toEmail');
+  const mailDateEl      = document.getElementById('mailDate');
+  const attachRow       = document.getElementById('attachRow');
+  const previewFrame    = document.getElementById('previewFrame');
+
+  // NEW: wrappers for project-only mode toggling
+  const emailSummaryHeader = document.getElementById('emailSummaryHeader');
+  const emailContent       = document.getElementById('emailContent');
+
+  // NEW: Version pill
+  const aysVersionPill = document.getElementById('aysVersionPill');
+
+  // Project meta inputs
+  const projNameInput         = document.getElementById('projNameInput');
+  const projEmailInput        = document.getElementById('projEmailInput');
+  const projBidDateInput      = document.getElementById('projBidDateInput');
+  const projDrawingDateInput  = document.getElementById('projDrawingDateInput');
+  const projAddressInput      = document.getElementById('projAddressInput');
+  const projEngineerInput     = document.getElementById('projEngineerInput');
+  const projGCInput           = document.getElementById('projGCInput');
+  const projNotesInput        = document.getElementById('projNotesInput');
+  const projMetaSaveBtn       = document.getElementById('projMetaSaveBtn');
+  const projMetaStatus        = document.getElementById('projMetaStatus');
+
+  const sendToAiBtn     = document.getElementById('sendToAiBtn');
+  const confirmDlg      = document.getElementById('confirmSendDlg');
+  const confirmFrame    = document.getElementById('confirmSendFrame');
+
+  const editProjectDlg   = document.getElementById('editProjectDlg');
+  const editProjectFrame = document.getElementById('editProjectFrame');
+  const editProjectBtn   = document.getElementById('editProjectBtn');
+
+  const newProjDlg       = document.getElementById('newProjectDlg');
+  const newProjFrame     = document.getElementById('newProjectFrame');
+
+  const statSubmissionsEl = document.getElementById('statSubmissions');
+  const statPagesEl       = document.getElementById('statPages');
+
+  let projects = [];
+  let expanded = new Set();
+  let currentProjectId  = null;
+  let currentDocFolder  = null;
+  let currentProjectObj = null;
+
+  // Existing localStorage support (kept as fallback)
+  const BID_LS_KEY = 'ays_proj_bid_flags';
+  let bidDecisions = {};
+  try {
+    const stored = localStorage.getItem(BID_LS_KEY);
+    if (stored) bidDecisions = JSON.parse(stored) || {};
+  } catch (e) { bidDecisions = {}; }
+
+  function saveBidDecisions() {
+    try {
+      localStorage.setItem(BID_LS_KEY, JSON.stringify(bidDecisions));
+    } catch (e) { console.warn('Could not save bid decisions:', e); }
+  }
+
+  const esc = s => String(s || '').replace(/&/g,'&amp;')
+                                  .replace(/</g,'&lt;')
+                                  .replace(/>/g,'&gt;');
+
+  function getDisplayName(raw) {
+    if (!raw) return '(unnamed document)';
+    const noExt = raw.replace(/\.[^.]+$/, '');
+    const parts = noExt.split('_');
+    if (parts.length >= 3 && /^\d/.test(parts[2])) {
+      return parts[0] + '_' + parts[1];
+    }
+    return noExt;
+  }
+
+  function formatTimestamp(ts) {
+    if (!ts) return '';
+    const m = ts.match(/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/);
+    if (m) {
+      const year  = parseInt(m[1], 10);
+      const month = parseInt(m[2], 10);
+      const day   = parseInt(m[3], 10);
+      let hour    = parseInt(m[4], 10);
+      const minute = parseInt(m[5], 10);
+
+      let ampm = 'AM';
+      if (hour === 0) {
+        hour = 12;
+      } else if (hour === 12) {
+        ampm = 'PM';
+      } else if (hour > 12) {
+        ampm = 'PM';
+        hour -= 12;
+      }
+
+      const mm  = month.toString().padStart(2, '0');
+      const dd  = day.toString().padStart(2, '0');
+      const h   = hour.toString();
+      const min = minute.toString().padStart(2, '0');
+      return `${mm}/${dd}/${year} ${h}:${min} ${ampm}`;
+    }
+    return ts;
+  }
+
+  // ---- DATE HELPERS ----
+  function toDateInputValue(val) {
+    if (!val) return '';
+    val = String(val).trim();
+    if (/^\d{4}-\d{2}-\d{2}$/.test(val)) {
+      return val;
+    }
+    const m = val.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if (m) {
+      const mm = m[1].padStart(2,'0');
+      const dd = m[2].padStart(2,'0');
+      const yyyy = m[3];
+      return `${yyyy}-${mm}-${dd}`;
+    }
+    return '';
+  }
+
+  function formatToMMDDYYYY(value) {
+    if (!value) return "";
+    value = String(value).trim();
+    if (/^\d{1,2}\/\d{1,2}\/\d{4}$/.test(value)) return value;
+    const m = value.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if (m) {
+      const yyyy = m[1];
+      const mm = m[2];
+      const dd = m[3];
+      return `${mm}/${dd}/${yyyy}`;
+    }
+    return value;
+  }
+
+  // ===========================
+  // NEW: "Project selected" view
+  // ===========================
+
+  // Toggle email box mode:
+  // - project-only: show project details + footer buttons, hide email summary + attachments + preview
+  // - doc: show everything
+  function setEmailMode(mode) {
+    if (!emailBox) return;
+    if (mode === 'project') {
+      emailBox.classList.add('is-project-only');
+      if (emailSummaryHeader) emailSummaryHeader.style.display = 'none';
+      if (emailContent) emailContent.style.display = 'none';
+      attachRow.style.display = 'none';
+      // keep iframe src untouched, but you can blank it safely:
+      previewFrame.src = 'about:blank';
+    } else {
+      emailBox.classList.remove('is-project-only');
+      if (emailSummaryHeader) emailSummaryHeader.style.display = '';
+      if (emailContent) emailContent.style.display = '';
+      // attachRow display is controlled inside showEmail()
+    }
+  }
+
+  function mergedMeta(project, doc) {
+    const out = {};
+    if (project) Object.assign(out, project);
+    if (project && project.meta) Object.assign(out, project.meta);
+    if (doc && doc.meta) Object.assign(out, doc.meta);
+    return out;
+  }
+
+  // Populate ONLY the editable project details from a project object (no email summary)
+  function fillProjectMetaFromProject(project) {
+    const metaAll = mergedMeta(project, null);
+
+    const baseProjectName =
+      metaAll.project_name ||
+      metaAll["Project Name"] ||
+      project.project_name ||
+      '';
+
+    const to =
+      metaAll.email ||
+      metaAll.Email ||
+      project.email ||
+      '';
+
+    projNameInput.value  = baseProjectName || '';
+    projEmailInput.value = to || '';
+
+    const bidRaw =
+      metaAll.meta_bid_date ||
+      metaAll["Bid Date"] ||
+      metaAll.bid_date ||
+      '';
+    const drawingRaw =
+      metaAll.meta_drawing_date ||
+      metaAll["Drawing Date"] ||
+      metaAll.drawing_date ||
+      '';
+
+    projBidDateInput.value     = toDateInputValue(bidRaw);
+    projDrawingDateInput.value = toDateInputValue(drawingRaw);
+
+    projAddressInput.value =
+      metaAll.meta_address ||
+      metaAll.Address ||
+      metaAll.address ||
+      '';
+    projEngineerInput.value =
+      metaAll.meta_engineer ||
+      metaAll.Engineer ||
+      metaAll.engineer ||
+      '';
+    projGCInput.value =
+      metaAll.meta_general_contractor ||
+      metaAll["General Contractor"] ||
+      metaAll.general_contractor ||
+      '';
+    projNotesInput.value =
+      metaAll.meta_notes ||
+      metaAll.Notes ||
+      metaAll.notes ||
+      '';
+
+    projMetaStatus.textContent = '';
+    projMetaStatus.classList.remove('err');
+  }
+
+  // Called when a project row is clicked (before any doc is clicked)
+  function selectProject(project) {
+    if (!project) return;
+
+    currentProjectId  = project.project_id || null;
+    currentProjectObj = project;
+    currentDocFolder  = null;
+
+    // show the right panel now
+    empty.style.display = 'none';
+    emailBox.style.display = '';
+
+    // hide email summary + preview until a doc is clicked
+    setEmailMode('project');
+
+    // fill editable project details from the project itself
+    fillProjectMetaFromProject(project);
+
+    // keep these consistent (they'll be hidden anyway in project mode)
+    subjectEl.textContent = 'AYS Report';
+    toEmailEl.textContent = '';
+    mailDateEl.textContent = '';
+    fromNameEl.textContent  = 'AYS Reports';
+    fromEmailEl.textContent = 'noreply@areyousspecified.com';
+  }
+
+  // ===========================
+  // NEW: Bid/No Bid server sync
+  // ===========================
+
+  // Normalize API -> dropdown values
+  // Server may send "Bid"/"No Bid" (preferred) or "bid"/"no_bid" (older)
+  function normalizeBidForSelect(v) {
+    v = (v || '').toString().trim();
+    if (!v) return '';
+    if (v === 'Bid' || v === 'bid') return 'bid';
+    if (v === 'No Bid' || v === 'no_bid' || v === 'nobid' || v === 'no-bid') return 'no_bid';
+    return '';
+  }
+
+  // Tooltip helper
+  function bidTooltip(p) {
+    const by = (p && (p.bid_updated_by || p.updated_by)) || '';
+    const at = (p && (p.bid_updated_at || p.updated_at)) || '';
+    if (!by && !at) return '';
+    const byPart = by ? `by ${by}` : '';
+    const atPart = at ? `@ ${at}` : '';
+    return `Last updated ${byPart} ${atPart}`.trim();
+  }
+
+  // POST to server so it is shared across users
+  async function saveBidToServer(projectId, projectName, selectValue) {
+    // selectValue is 'bid' or 'no_bid' or ''
+    const bid_status =
+      selectValue === 'bid' ? 'Bid' :
+      selectValue === 'no_bid' ? 'No Bid' :
+      '';
+
+    const payload = {
+      job_id: String(projectId),
+      project_name: projectName || '',
+      bid_status: bid_status
+    };
+
+    try {
+      const resp = await fetch('/api/bid-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+
+      // If endpoint missing or errors, we keep your localStorage behavior and do not break UI
+      if (!resp.ok) throw new Error('bid-status non-200');
+
+      const data = await resp.json().catch(() => ({}));
+      // Optionally refresh projects to pull updated updated_by/at
+      await loadProjects();
+
+      return data;
+    } catch (err) {
+      console.warn('Bid status save failed (server). Falling back to local only:', err);
+      return null;
+    }
+  }
+
+  async function loadProjects(){
+    const r = await fetch('/api/explorer/projects');
+    projects = await r.json();
+    renderProjects();
+  }
+
+  function renderProjects(){
+    const q = filter.value.trim().toLowerCase();
+    const items = [...projects].sort((a,b)=> (b.sort_key||0)-(a.sort_key||0));
+    projList.innerHTML = '';
+    items
+      .filter(p =>
+        !q ||
+        (p.project_name||'').toLowerCase().includes(q) ||
+        (p.email||'').toLowerCase().includes(q)
+      )
+      .forEach(p => {
+        const row = document.createElement('div');
+        row.className = 'proj';
+        row.dataset.pid = p.project_id;
+
+        const key = String(p.project_id);
+
+        // NEW: prefer server-backed status; fall back to localStorage
+        const serverExisting = normalizeBidForSelect(p.bid_status);
+        const localExisting = (bidDecisions[key] || '');
+        const existing = serverExisting || localExisting;
+
+        row.innerHTML = `
+          <div class="caret">${expanded.has(p.project_id) ? '▾' : '▸'}</div>
+          <div style="flex:1;">
+            <div class="name">${esc(p.project_name)}</div>
+            <div class="meta">${esc(p.date)} • ${esc(p.email)}</div>
+          </div>
+          <div class="bid-col" style="padding-left:10px;">
+            <select class="bid-select" data-pid="${esc(p.project_id)}" title="${esc(bidTooltip(p))}">
+              <option value="">–</option>
+              <option value="bid"${existing === 'bid' ? ' selected' : ''}>Bid</option>
+              <option value="no_bid"${existing === 'no_bid' ? ' selected' : ''}>No Bid</option>
+            </select>
+          </div>
+        `;
+
+        row.addEventListener('click', (ev) => {
+          if (ev.target.closest('.bid-select')) return;
+
+          // NEW: select project immediately (shows project details + buttons, hides email summary)
+          selectProject(p);
+
+          // existing behavior: expand/collapse docs
+          toggleProject(p.project_id);
+        });
+
+        const sel = row.querySelector('.bid-select');
+        if (sel) {
+          sel.addEventListener('click', (ev) => ev.stopPropagation());
+          sel.addEventListener('change', async (ev) => {
+            const v = ev.target.value;
+            const pid = ev.target.getAttribute('data-pid');
+
+            // Keep your existing localStorage behavior (fallback + instant UI persistence)
+            bidDecisions[pid] = v;
+            saveBidDecisions();
+
+            // NEW: persist to server (shared)
+            const res = await saveBidToServer(pid, p.project_name || '', v);
+
+            // If server returns record with timestamps/user, update tooltip immediately
+            if (res && res.record) {
+              const by = res.record.updated_by || '';
+              const at = res.record.updated_at || '';
+              const tip = (by || at) ? `Last updated ${by ? 'by ' + by : ''} ${at ? '@ ' + at : ''}`.trim() : '';
+              ev.target.title = tip;
+            }
+          });
+        }
+
+        projList.appendChild(row);
+
+        if (expanded.has(p.project_id)) {
+          const holder = document.createElement('div');
+          holder.className = 'docs';
+          holder.id = `docs-${p.project_id}`;
+          holder.innerHTML = `<div class="doc"><div class="doc-body"><div class="title">Loading…</div></div></div>`;
+          projList.appendChild(holder);
+          fetchDocs(p.project_id);
+        }
+      });
+  }
+
+  function toggleProject(pid){
+    if (expanded.has(pid)) {
+      expanded.delete(pid);
+      const ex = document.getElementById(`docs-${pid}`);
+      if (ex) ex.remove();
+
+      // If collapsing the currently selected project AND no doc selected, return to empty state
+      if (String(currentProjectId) === String(pid) && !currentDocFolder) {
+        emailBox.style.display = 'none';
+        empty.style.display = 'block';
+      }
+    } else {
+      expanded.add(pid);
+    }
+    renderProjects();
+  }
+
+  async function fetchDocs(pid){
+    const r = await fetch(`/api/explorer/${encodeURIComponent(pid)}/docs`);
+    const data = await r.json();
+    const holder = document.getElementById(`docs-${pid}`);
+    if (!holder) return;
+
+    holder.innerHTML = '';
+    if (!data.docs || !data.docs.length){
+      holder.innerHTML = `<div class="doc"><div class="doc-body"><div class="title">No documents</div></div></div>`;
+      return;
+    }
+
+    data.docs.forEach(d => {
+      const row = document.createElement('div');
+      row.className = 'doc';
+
+      const originalLabel = d.attachment_name || d.doc_folder || '(unnamed document)';
+      const displayLabel  = getDisplayName(originalLabel);
+
+      row.innerHTML = `
+        <div class="doc-body">
+          <div class="title">${esc(displayLabel)}</div>
+          <div><span class="chip">attachments</span></div>
+        </div>
+        <button class="icon-btn delete-doc-btn" title="Delete document">
+          🗑️
+        </button>
+      `;
+
+      const titleEl = row.querySelector('.title');
+      const rawSubmitted = d.submitted_at_display || d.submitted_at || '';
+      const formatted = rawSubmitted ? formatTimestamp(rawSubmitted) : '';
+      if (titleEl) {
+        titleEl.title = formatted ? `Submitted: ${formatted}` : originalLabel;
+      }
+
+      const body = row.querySelector('.doc-body');
+      body.addEventListener('click', () => showEmail(data.project, d));
+
+      const delBtn = row.querySelector('.delete-doc-btn');
+      delBtn.addEventListener('click', (ev) => {
+        ev.stopPropagation();
+        handleDeleteDoc(data.project.project_id, d.doc_folder);
+      });
+
+      holder.appendChild(row);
+    });
+  }
+
+  function iconFor(ext){
+    switch((ext||'').toLowerCase()){
+      case 'zip':  return '🧷';
+      case 'xlsx': return '📊';
+      case 'pdf':  return '📄';
+      default:     return '📎';
+    }
+  }
+
+  function showEmail(project, doc){
+    empty.style.display   = 'none';
+    emailBox.style.display = '';
+
+    // NEW: doc mode (shows summary + attachments + preview)
+    setEmailMode('doc');
+
+    currentProjectId  = project.project_id || null;
+    currentDocFolder  = doc.doc_folder || null;
+    currentProjectObj = project;
+
+    const metaAll = mergedMeta(project, doc);
+
+    const attachmentLabel = doc.attachment_name || doc.doc_folder || '';
+    const baseProjectName =
+      metaAll.project_name ||
+      metaAll["Project Name"] ||
+      project.project_name ||
+      '';
+
+    const baseSubject = baseProjectName;
+    subjectEl.textContent =
+      doc.subject ||
+      (baseSubject && attachmentLabel
+        ? `${baseSubject} — ${attachmentLabel}`
+        : (baseSubject || attachmentLabel || 'AYS Report'));
+
+    fromNameEl.textContent  = 'AYS Reports';
+    fromEmailEl.textContent = 'noreply@areyousspecified.com';
+
+    const to =
+      metaAll.email ||
+      metaAll.Email ||
+      project.email ||
+      (doc.email_meta && doc.email_meta.to_email) ||
+      '';
+    toEmailEl.textContent = to;
+
+    const rawMailDate =
+      (doc.submitted_at_display || doc.submitted_at) ||
+      project.date ||
+      (doc.email_meta && doc.email_meta.date) ||
+      metaAll.date ||
+      '';
+    mailDateEl.textContent = rawMailDate ? formatTimestamp(rawMailDate) : '';
+
+    // Fill editable project details
+    projNameInput.value  = baseProjectName || '';
+    projEmailInput.value = to || '';
+
+    const bidRaw =
+      metaAll.meta_bid_date ||
+      metaAll["Bid Date"] ||
+      metaAll.bid_date ||
+      '';
+    const drawingRaw =
+      metaAll.meta_drawing_date ||
+      metaAll["Drawing Date"] ||
+      metaAll.drawing_date ||
+      '';
+
+    projBidDateInput.value     = toDateInputValue(bidRaw);
+    projDrawingDateInput.value = toDateInputValue(drawingRaw);
+
+    projAddressInput.value =
+      metaAll.meta_address ||
+      metaAll.Address ||
+      metaAll.address ||
+      '';
+    projEngineerInput.value =
+      metaAll.meta_engineer ||
+      metaAll.Engineer ||
+      metaAll.engineer ||
+      '';
+    projGCInput.value =
+      metaAll.meta_general_contractor ||
+      metaAll["General Contractor"] ||
+      metaAll.general_contractor ||
+      '';
+    projNotesInput.value =
+      metaAll.meta_notes ||
+      metaAll.Notes ||
+      metaAll.notes ||
+      '';
+
+    projMetaStatus.textContent = '';
+    projMetaStatus.classList.remove('err');
+
+    attachRow.innerHTML = '';
+    const atts = (doc.attachments || []).filter(a => a && a.href);
+    if (atts.length){
+      attachRow.style.display = 'flex';
+      atts.forEach(a => {
+        const el = document.createElement('a');
+        el.className = 'att';
+        el.href   = a.href;
+        el.target = '_blank';
+        el.rel    = 'noopener';
+        el.innerHTML = `
+          <span class="icon">${iconFor(a.ext)}</span>
+          <span class="name">${esc(a.label)}</span>
+        `;
+        attachRow.appendChild(el);
+      });
+    } else {
+      attachRow.style.display = 'none';
+    }
+
+    const src = (doc.preview && (doc.preview.html || doc.preview.pdf)) || 'about:blank';
+    previewFrame.src = src;
+  }
+
+  async function loadUsageStats() {
+    try {
+      const resp = await fetch('/api/usage_stats');
+      if (!resp.ok) throw new Error('Bad status');
+      const data = await resp.json();
+      if (typeof data.total_submissions !== 'undefined') {
+        statSubmissionsEl.textContent = Number(data.total_submissions).toLocaleString();
+      }
+      if (typeof data.total_pages !== 'undefined') {
+        statPagesEl.textContent = Number(data.total_pages).toLocaleString();
+      }
+    } catch (err) {
+      console.error('Failed to load usage stats:', err);
+      statSubmissionsEl.textContent = '–';
+      statPagesEl.textContent = '–';
+    }
+  }
+
+  // NEW: load version (Chat-like)
+  async function loadAysVersion() {
+    // 1) try API
+    try {
+      const r = await fetch('/api/version', { cache: 'no-store' });
+      if (r.ok) {
+        const data = await r.json().catch(() => ({}));
+        const v = data.version || data.ays_version || data.app_version || '';
+        if (v) {
+          aysVersionPill.textContent = `AYS v${v}`;
+          aysVersionPill.title = `AYS version ${v}`;
+          return;
+        }
+      }
+    } catch (e) {}
+
+    // 2) try window.AYS_VERSION if you inject it somewhere else
+    if (window.AYS_VERSION) {
+      aysVersionPill.textContent = `AYS v${window.AYS_VERSION}`;
+      aysVersionPill.title = `AYS version ${window.AYS_VERSION}`;
+      return;
+    }
+
+    // 3) try body data attribute
+    const bodyV = (document.body && document.body.dataset && document.body.dataset.aysVersion) ? document.body.dataset.aysVersion : '';
+    if (bodyV) {
+      aysVersionPill.textContent = `AYS v${bodyV}`;
+      aysVersionPill.title = `AYS version ${bodyV}`;
+      return;
+    }
+
+    // fallback
+    aysVersionPill.textContent = 'AYS v–';
+    aysVersionPill.title = 'AYS version';
+  }
+
+
+function initNavbarDropdowns() {
+  const groups = document.querySelectorAll('.nav-group');
+  groups.forEach(group => {
+    const dropdown = group.querySelector('.dropdown');
+    if (!dropdown) return;
+
+    let hideTimeout;
+
+    group.addEventListener('mouseenter', () => {
+      clearTimeout(hideTimeout);
+      dropdown.style.display = 'block';
+    });
+
+    group.addEventListener('mouseleave', () => {
+      hideTimeout = setTimeout(() => {
+        dropdown.style.display = 'none';
+      }, 200); // small delay so it doesn't vanish the moment you move
+    });
+  });
+}
+
+
+  filter.addEventListener('input', renderProjects);
+  loadProjects();
+  loadUsageStats();
+  loadAysVersion();
+  initNavbarDropdowns();
+
+  function openNewProject(){
+    const url = newProjDlg.dataset.uploadUrl;
+    newProjFrame.src = url;
+    newProjDlg.showModal();
+  }
+
+  function closeNewProject(){
+    if (newProjDlg.open) newProjDlg.close();
+    if (typeof loadProjects === 'function') loadProjects();
+    if (typeof loadUsageStats === 'function') loadUsageStats();
+  }
+
+  window.addEventListener('message', (ev) => {
+    if (ev && ev.data && ev.data.type === 'ays-project-created') {
+      closeNewProject();
+    }
+    if (ev && ev.data && ev.data.type === 'ays-intent-saved') {
+      closeConfirmSend();
+      if (typeof loadUsageStats === 'function') loadUsageStats();
+    }
+  });
+
+  newProjDlg.addEventListener('click', (e) => {
+    const rect = newProjFrame.getBoundingClientRect();
+    const inside =
+      e.clientX >= rect.left && e.clientX <= rect.right &&
+      e.clientY >= rect.top  && e.clientY <= rect.bottom;
+    if (!inside) newProjDlg.close();
+  });
+
+  function openConfirmSend(){
+    if (!currentProjectId || !currentDocFolder) {
+      alert('Please select a project document first.');
+      return;
+    }
+    const base = confirmDlg.dataset.baseUrl;
+    const params = new URLSearchParams({
+      project_id: currentProjectId,
+      doc_folder: currentDocFolder
+    });
+    confirmFrame.src = `${base}?${params.toString()}`;
+    confirmDlg.showModal();
+  }
+
+  function closeConfirmSend(){
+    if (confirmDlg.open) confirmDlg.close();
+  }
+
+  if (sendToAiBtn) {
+    sendToAiBtn.addEventListener('click', openConfirmSend);
+  }
+
+  confirmDlg.addEventListener('click', (e) => {
+    const rect = confirmFrame.getBoundingClientRect();
+    const inside =
+      e.clientX >= rect.left && e.clientX <= rect.right &&
+      e.clientY >= rect.top  && e.clientY <= rect.bottom;
+    if (!inside) confirmDlg.close();
+  });
+
+  function openEditProject(scrollToUpload=false) {
+    if (!currentProjectId) {
+      alert("Select a project/document first.");
+      return;
+    }
+    let url = `/project/${currentProjectId}/edit`;
+    if (scrollToUpload) {
+      url += '?scroll=upload';
+    }
+    editProjectFrame.src = url;
+    editProjectDlg.showModal();
+  }
+
+  function closeEditProject(){
+    if (editProjectDlg.open) editProjectDlg.close();
+    if (typeof loadProjects === 'function') loadProjects();
+  }
+
+  if (editProjectBtn) {
+    editProjectBtn.addEventListener('click', () => openEditProject(false));
+  }
+
+  editProjectDlg.addEventListener('click', (e) => {
+    const rect = editProjectFrame.getBoundingClientRect();
+    const inside =
+      e.clientX >= rect.left && e.clientX <= rect.right &&
+      e.clientY >= rect.top  && e.clientY <= rect.bottom;
+    if (!inside) editProjectDlg.close();
+  });
+
+  async function handleDeleteDoc(projectId, docFolder) {
+    if (!projectId || !docFolder) return;
+    const ok = window.confirm(`Delete document "${docFolder}" from this project?`);
+    if (!ok) return;
+
+    try {
+      const resp = await fetch(
+        `/api/project/${encodeURIComponent(projectId)}/docs/${encodeURIComponent(docFolder)}/delete`,
+        {
+          method: 'POST',
+          headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }
+      );
+      if (!resp.ok) {
+        console.error('Delete failed with status', resp.status);
+        alert('Failed to delete document.');
+        return;
+      }
+      const data = await resp.json().catch(() => ({}));
+      console.log('Delete result:', data);
+
+      if (currentProjectId === projectId && currentDocFolder === docFolder) {
+        previewFrame.src = 'about:blank';
+        // Return to project-only mode since we still have a project selected
+        currentDocFolder = null;
+        setEmailMode('project');
+      }
+
+      if (expanded.has(projectId)) {
+        fetchDocs(projectId);
+      }
+    } catch (err) {
+      console.error('Error deleting doc:', err);
+      alert('Error deleting document.');
+    }
+  }
+
+  // Save Project Details inline
+  if (projMetaSaveBtn) {
+    projMetaSaveBtn.addEventListener('click', async () => {
+      if (!currentProjectId) {
+        alert("Select a project/document first.");
+        return;
+      }
+
+      projMetaStatus.textContent = 'Saving...';
+      projMetaStatus.classList.remove('err');
+
+      const projectName = (projNameInput.value || '').trim() || '(Untitled Project)';
+
+      const payload = {
+        project_name: projectName,
+        email: projEmailInput.value || '',
+        meta_bid_date:           formatToMMDDYYYY(projBidDateInput.value || ''),
+        meta_drawing_date:       formatToMMDDYYYY(projDrawingDateInput.value || ''),
+        meta_address:            projAddressInput.value     || '',
+        meta_engineer:           projEngineerInput.value    || '',
+        meta_general_contractor: projGCInput.value          || '',
+        meta_notes:              projNotesInput.value       || '',
+      };
+
+      try {
+        const resp = await fetch(`/project/${encodeURIComponent(currentProjectId)}/update-meta`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await resp.json().catch(() => ({}));
+        if (!resp.ok || data.ok === false) {
+          projMetaStatus.textContent = 'Error saving details';
+          projMetaStatus.classList.add('err');
+          return;
+        }
+
+        // Only update subject if we are in doc mode; if project-only, keep summary hidden anyway
+        if (currentDocFolder) {
+          subjectEl.textContent = projectName + (currentDocFolder ? ` — ${currentDocFolder}` : '');
+        }
+        toEmailEl.textContent = payload.email;
+
+        if (projects && projects.length) {
+          const p = projects.find(p => String(p.project_id) === String(currentProjectId));
+          if (p) {
+            p.project_name = projectName;
+            p.email = payload.email;
+          }
+          renderProjects();
+        }
+
+        projMetaStatus.textContent = 'Saved';
+        projMetaStatus.classList.remove('err');
+        setTimeout(() => { projMetaStatus.textContent = ''; }, 2500);
+
+      } catch (err) {
+        console.error('update-meta failed', err);
+        projMetaStatus.textContent = 'Error saving details';
+        projMetaStatus.classList.add('err');
+      }
+    });
+  }
+
+// ==========================================================
+// ✅ SILENT AUTO-REFRESH (NO "Loading..." FLASH)
+// - Pulls new jobs (projects) in automatically
+// - Pulls new docs into expanded projects automatically
+// - Does NOT re-render unless data actually changed
+// - Does NOT show "Loading..." placeholders during refresh
+// Keeps all existing functionality.
+// ==========================================================
+const AUTOREFRESH_MS = 5000; // adjust if you want
+let _autoRefreshTimer = null;
+let _autoRefreshInFlight = false;
+
+// Signatures so we only update UI when something actually changed
+let _lastProjectsSig = '';
+const _lastDocsSigByPid = new Map();
+
+// small helper: stable-ish signature from list
+function _sigForProjects(list) {
+  // Use only fields that matter for sidebar list + sorting
+  const compact = (list || []).map(p => ({
+    id: String(p.project_id || ''),
+    name: String(p.project_name || ''),
+    email: String(p.email || ''),
+    date: String(p.date || ''),
+    sort: Number(p.sort_key || 0),
+    bid: String(p.bid_status || ''),
+    bu: String(p.bid_updated_at || p.updated_at || ''),
+    bb: String(p.bid_updated_by || p.updated_by || '')
+  }));
+  return JSON.stringify(compact);
+}
+
+function _sigForDocs(docs) {
+  const compact = (docs || []).map(d => ({
+    folder: String(d.doc_folder || ''),
+    att: String(d.attachment_name || ''),
+    sub: String(d.submitted_at_display || d.submitted_at || '')
+  }));
+  return JSON.stringify(compact);
+}
+
+// Fetch projects WITHOUT rendering
+async function fetchProjectsData() {
+  const r = await fetch('/api/explorer/projects', { cache: 'no-store' });
+  if (!r.ok) throw new Error(`projects HTTP ${r.status}`);
+  return await r.json();
+}
+
+// Silent refresh of expanded docs: no "Loading..." placeholder
+async function refreshExpandedDocsSilently() {
+  if (!expanded || !expanded.size) return;
+
+  for (const pid of expanded) {
+    const holder = document.getElementById(`docs-${pid}`);
+    if (!holder) continue; // not expanded in DOM
+
+    try {
+      const r = await fetch(`/api/explorer/${encodeURIComponent(pid)}/docs`, { cache: 'no-store' });
+      if (!r.ok) continue;
+      const data = await r.json().catch(() => ({}));
+
+      const docs = data.docs || [];
+      const newSig = _sigForDocs(docs);
+      const oldSig = _lastDocsSigByPid.get(String(pid)) || '';
+
+      // No change -> do nothing (no flicker)
+      if (newSig === oldSig) continue;
+
+      _lastDocsSigByPid.set(String(pid), newSig);
+
+      // Update DOM ONLY now (no loading state)
+      holder.innerHTML = '';
+
+      if (!docs.length) {
+        holder.innerHTML = `<div class="doc"><div class="doc-body"><div class="title">No documents</div></div></div>`;
+        continue;
+      }
+
+      docs.forEach(d => {
+        const row = document.createElement('div');
+        row.className = 'doc';
+
+        const originalLabel = d.attachment_name || d.doc_folder || '(unnamed document)';
+        const displayLabel  = getDisplayName(originalLabel);
+
+        row.innerHTML = `
+          <div class="doc-body">
+            <div class="title">${esc(displayLabel)}</div>
+            <div><span class="chip">attachments</span></div>
+          </div>
+          <button class="icon-btn delete-doc-btn" title="Delete document">
+            🗑️
+          </button>
+        `;
+
+        const titleEl = row.querySelector('.title');
+        const rawSubmitted = d.submitted_at_display || d.submitted_at || '';
+        const formatted = rawSubmitted ? formatTimestamp(rawSubmitted) : '';
+        if (titleEl) {
+          titleEl.title = formatted ? `Submitted: ${formatted}` : originalLabel;
+        }
+
+        const body = row.querySelector('.doc-body');
+        body.addEventListener('click', () => showEmail(data.project, d));
+
+        const delBtn = row.querySelector('.delete-doc-btn');
+        delBtn.addEventListener('click', (ev) => {
+          ev.stopPropagation();
+          handleDeleteDoc(data.project.project_id, d.doc_folder);
+        });
+
+        holder.appendChild(row);
+      });
+    } catch (e) {
+      console.warn('Silent doc refresh failed for pid', pid, e);
+    }
+  }
+}
+
+function startAutoRefresh() {
+  stopAutoRefresh();
+  if (document.hidden) return;
+
+  _autoRefreshTimer = setInterval(async () => {
+    if (document.hidden) return;
+    if (_autoRefreshInFlight) return;
+
+    _autoRefreshInFlight = true;
+    try {
+      // 1) Pull projects in background
+      const newProjects = await fetchProjectsData();
+      const newSig = _sigForProjects(newProjects);
+
+      // Only re-render sidebar if something actually changed
+      if (newSig !== _lastProjectsSig) {
+        _lastProjectsSig = newSig;
+
+        // This preserves all your existing behavior
+        projects = newProjects;
+        renderProjects();
+
+        // After render, holders are recreated, so refresh docs silently
+        // (and establish signatures for expanded)
+        await refreshExpandedDocsSilently();
+      } else {
+        // No project list change, just silently refresh expanded docs
+        await refreshExpandedDocsSilently();
+      }
+
+      // Optional: keep stats updated (no flicker)
+      if (typeof loadUsageStats === 'function') loadUsageStats();
+
+    } catch (err) {
+      console.warn('Auto-refresh tick failed:', err);
+    } finally {
+      _autoRefreshInFlight = false;
+    }
+  }, AUTOREFRESH_MS);
+}
+
+function stopAutoRefresh() {
+  if (_autoRefreshTimer) {
+    clearInterval(_autoRefreshTimer);
+    _autoRefreshTimer = null;
+  }
+}
+
+// Pause polling when tab is hidden; resume when visible
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) stopAutoRefresh();
+  else startAutoRefresh();
+});
+
+// Initialize signatures once after initial loadProjects completes
+(async function initSilentAutoRefresh() {
+  try {
+    const initial = await fetchProjectsData();
+    _lastProjectsSig = _sigForProjects(initial);
+    // keep your existing initial load behavior
+    // (do NOT replace your existing loadProjects() call)
+  } catch (e) {}
+  startAutoRefresh();
+})();
+
+</script>
+
+
+</body>
+</html>
+
+
+
+
+
+
+

@@ -1,4 +1,4 @@
-##the file path for this application is C:\Users\joeyf\Music\pdf reader rom\mccook_deploy_1
+# ays_324_betatwo_flask.py
 from flask import Flask, request, jsonify, render_template, url_for, send_from_directory, redirect, send_file, session, flash
 from flask_cors import CORS
 import os
@@ -39,7 +39,7 @@ from openpyxl import load_workbook
 from openpyxl.styles import numbers
 import shutil
 import boto3
-from helpers_async_s3_0_6 import (
+from helpers_async_s3_0_9 import (
     AWS_REGION, S3_BUCKET, S3_UPLOAD_PREFIX, S3_RESULTS_PREFIX,
     s3_key, s3_upload_bytes, s3_upload_file, s3_presign_get,
     slugify, make_project_id,
@@ -52,7 +52,9 @@ from helpers_async_s3_0_6 import (
     S3_BUCKET, 
     s3_key, 
     s3_presign_get, 
-    project_index_from_dashboard # <-- add this
+    project_index_from_dashboard, # <-- add this
+    get_usage_stats,
+    get_next_available_name_local,
 )
 
 _s3 = boto3.client("s3", region_name=AWS_REGION)
@@ -105,7 +107,7 @@ equipment_terms, manufacturer_terms, model_terms, universal_terms, competitor_te
 
 processing_cancelled = threading.Event()
 
-users = {'ays-admin': 'Lx@73z!Q8kV9w#jP', 'login##': '68result96milk'}
+users = {'romays': 'betatwo', 'login': 'betatwobetatwo'}
 
 # Login page route
 @app.route('/', methods=['GET', 'POST'])
@@ -113,13 +115,13 @@ def login():
     """
     Login page route for user authentication.
     """
-    users = {'ays-admin': 'wordpass!321', 'login##': '68result96milk'}
+    users = {'romays': 'betatwo', 'login': 'betatwobetatwo'}
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
         if username in users and users[username] == password:
             session['user'] = username
-            return redirect(url_for('upload_file'))
+            return redirect(url_for('explorer_page'))
         else:
             flash('Invalid credentials, please try again.')
     return render_template('login.html')
@@ -243,38 +245,63 @@ def terms():
         terms_data = []
 
     if request.method == 'POST':
-        term_type = request.form.get('term_type')  # Get the category (e.g., 'universal')
-        new_term = request.form.get(f'new_{term_type}_term', '').strip()  # Get the new term
+        term_type = request.form.get('term_type')  # e.g. 'manufacturer', 'competitor', etc.
+        action = request.form.get('action', 'add')  # 'add' or 'delete'
+        logging.debug(f"POST /terms term_type={term_type}, action={action}")
 
-        logging.debug(f"Received term_type: {term_type}, new_term: {new_term}")
+        if not term_type:
+            # No category specified; just go back to page
+            return redirect(url_for('terms'))
 
-        if term_type and new_term:
-            # Find the matching category and add the term
-            category_found = False
-            for category in terms_data:
-                if category['title'].lower() == term_type.replace('_', ' ').lower():
-                    category_found = True
-                    if new_term not in category['terms']:  # Avoid duplicates
-                        category['terms'].append(new_term)
-                        logging.debug(f"Added new term '{new_term}' to category '{category['title']}'.")
-                    else:
-                        logging.debug(f"Term '{new_term}' already exists in category '{category['title']}'.")
-                    break
+        # Normalize to match JSON structure (titles: Manufacturer, Competitor, etc.)
+        normalized_type = term_type.replace('_', ' ').lower()
 
-            # If no matching category, log an error and return a message
-            if not category_found:
-                logging.error(f"Category '{term_type}' not found in terms_data. New term not added.")
-                return jsonify({'status': 'error', 'message': f"Category '{term_type}' not found."}), 400
+        # Find the matching category in terms_data
+        category = None
+        for cat in terms_data:
+            if cat.get('title', '').lower() == normalized_type:
+                category = cat
+                break
 
-            # Save updated terms to JSON file
-            try:
-                with open(filepath, 'w') as file:
-                    json.dump(terms_data, file, indent=4)
-                logging.debug("Successfully saved updated terms to file.")
-            except Exception as e:
-                logging.error(f"Error saving terms to JSON file: {e}")
-                return jsonify({'status': 'error', 'message': str(e)}), 500
+        if not category:
+            logging.error(f"Category '{term_type}' not found in terms_data.")
+            return jsonify({'status': 'error', 'message': f"Category '{term_type}' not found."}), 400
 
+        if action == 'add':
+            # Add a new term
+            new_term = request.form.get(f'new_{term_type}_term', '').strip()
+            logging.debug(f"Attempting to ADD term '{new_term}' to '{category['title']}'")
+
+            if new_term:
+                if new_term not in category['terms']:
+                    category['terms'].append(new_term)
+                    logging.debug(f"Added new term '{new_term}' to category '{category['title']}'.")
+                else:
+                    logging.debug(f"Term '{new_term}' already exists in category '{category['title']}'.")
+            else:
+                logging.debug("No new term provided; nothing to add.")
+
+        elif action == 'delete':
+            # Delete an existing term
+            delete_term = request.form.get('delete_term', '').strip()
+            logging.debug(f"Attempting to DELETE term '{delete_term}' from '{category['title']}'")
+
+            if delete_term and delete_term in category['terms']:
+                category['terms'].remove(delete_term)
+                logging.debug(f"Deleted term '{delete_term}' from category '{category['title']}'.")
+            else:
+                logging.debug(f"Term '{delete_term}' not found in category '{category['title']}' – nothing deleted.")
+
+        # Save updated terms back to JSON file
+        try:
+            with open(filepath, 'w') as file:
+                json.dump(terms_data, file, indent=4)
+            logging.debug("Successfully saved updated terms to file.")
+        except Exception as e:
+            logging.error(f"Error saving terms to JSON file: {e}")
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+
+        # Redirect back to the appropriate section anchor
         return redirect(url_for('terms') + '#' + term_type)
 
     # Prepare terms for rendering
@@ -288,7 +315,8 @@ def terms():
 
     logging.debug(f"Categorized terms before rendering: {categorized_terms}")
 
-    return render_template('terms.html', **categorized_terms)
+    return render_template('terms4.html', **categorized_terms)
+
 
 @app.route('/view_pdf')
 def view_pdf():
@@ -850,11 +878,50 @@ def format_table(rows):
     return "\n".join(output)
 
 
+
 from xhtml2pdf import pisa
+import io
+import logging
 
 def html_to_pdf(html_content, output_path):
-    with open(output_path, "wb") as f:
-        pisa.CreatePDF(io.StringIO(html_content), dest=f)
+    """
+    Convert HTML to PDF using xhtml2pdf.
+
+    If xhtml2pdf fails (e.g. due to a malformed table that causes
+    'must have at least a row and column'), we log the error and
+    write a simple fallback PDF instead of crashing the job.
+    """
+    try:
+        with open(output_path, "wb") as f:
+            result = pisa.CreatePDF(io.StringIO(html_content), dest=f)
+
+        # pisa.CreatePDF returns an object with .err count
+        if result.err:
+            logging.error("xhtml2pdf reported %s errors while rendering %s",
+                          result.err, output_path)
+
+    except Exception as e:
+        logging.exception("html_to_pdf failed, writing fallback PDF instead")
+
+        # Fallback: write a minimal PDF so the pipeline can continue
+        try:
+            from reportlab.pdfgen import canvas
+
+            buf = io.BytesIO()
+            c = canvas.Canvas(buf)
+            c.drawString(72, 720, "Email summary could not be rendered as PDF.")
+            c.drawString(72, 700, "Check the HTML view or dashboard for details.")
+            c.save()
+            buf.seek(0)
+
+            with open(output_path, "wb") as f:
+                f.write(buf.read())
+
+            logging.info("Fallback PDF written to %s", output_path)
+        except Exception:
+            # If even the fallback fails, log but don't re-raise
+            logging.exception("Fallback PDF generation also failed")
+
 
 
 # ---------------------------------------
@@ -867,83 +934,67 @@ def api_process_pdf():
     try:
         data = request.get_json()
 
-        # ✅ Validate
+        # basics
         filename = data.get('AttachmentName')
         content_b64 = data.get('AttachmentContent')
         original_receiver = data.get('From')
         original_subject = data.get('Subject')
         original_message_id = data.get('MessageID')
 
+        # ✅ NEW: meta fields passed from /project-process payload (or Power Automate)
+        meta_fields = data.get('Meta') or {}
+
         if not all([filename, content_b64, original_receiver, original_subject]):
             return jsonify({"error": "Missing required fields."}), 400
 
-        # ✅ Create AYS ID
+        # create AYS id
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
         ays_id = f"AYS-{timestamp}"
 
-        # ✅ Decode and save original PDF
+        # save original
         secure_name = secure_filename(filename)
         upload_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_name)
         with open(upload_path, 'wb') as f:
             f.write(base64.b64decode(content_b64))
 
-        # ✅ Process PDF
+        # process
         results = process_pdf_file(upload_path)
         if not results or not results.get('results'):
             return jsonify({"error": "Processing failed."}), 500
 
         results_data = results['results']
-
-        # ✅ Count keywords
         total_keywords = sum(len(t) for t in results_data.values() if t)
 
-        # ✅ Extract manufacturer and competitor terms
         manufacturer_rows = [
-            {
-                "Word": row.get('Word', ''),
-                "Page": row.get('Page', ''),
-                "Section": row.get('Section', ''),
-                "Section Name": row.get('Section Name', '')
-            }
-            for row in results_data.get('manufacturer', [])
+            {"Word": r.get('Word',''), "Page": r.get('Page',''), "Section": r.get('Section',''), "Section Name": r.get('Section Name','')}
+            for r in results_data.get('manufacturer', [])
         ]
-
         competitor_rows = [
-            {
-                "Word": row.get('Word', ''),
-                "Page": row.get('Page', ''),
-                "Section": row.get('Section', ''),
-                "Section Name": row.get('Section Name', '')
-            }
-            for row in results_data.get('competitor', [])
+            {"Word": r.get('Word',''), "Page": r.get('Page',''), "Section": r.get('Section',''), "Section Name": r.get('Section Name','')}
+            for r in results_data.get('competitor', [])
         ]
 
-        # ✅ Write Excel with ALL 7 tabs
+        # create Excel (unchanged)
         excel_filename = f"tables_{secure_name.rsplit('.', 1)[0]}.xlsx"
         excel_path = os.path.join(app.config['PROCESSED_FOLDER'], excel_filename)
         write_results_to_excel(results, excel_path)
 
-        # ✅ Get Highlighted PDF
+        # load highlighted pdf
         highlighted_pdf_filename = results.get('filename')
         if not highlighted_pdf_filename:
             return jsonify({"error": "Highlighted PDF missing."}), 500
-
         highlighted_pdf_path = os.path.join(app.config['PROCESSED_FOLDER'], highlighted_pdf_filename)
         if not os.path.isfile(highlighted_pdf_path):
             return jsonify({"error": "Highlighted PDF not found."}), 500
 
-        # ✅ Create highlighted-only PDF
+        # highlights-only
         original_base = os.path.splitext(filename)[0]
-        highlighted_only_pdf_path = os.path.join(
-            app.config['PROCESSED_FOLDER'],
-            f"only_highlights_{original_base}.pdf"
-        )
+        highlighted_only_pdf_path = os.path.join(app.config['PROCESSED_FOLDER'], f"only_highlights_{original_base}.pdf")
         create_highlighted_only_pdf(highlighted_pdf_path, results, highlighted_only_pdf_path)
 
-        # ✅ Determine recommendation
+        # recommendation logic (unchanged)
         has_mfg = bool(manufacturer_rows)
         has_comp = bool(competitor_rows)
-
         if has_mfg and has_comp:
             recommendation = "You and your competitor are specified. Bid this opportunity!"
             subject_summary = "Specified - Bid!"
@@ -957,7 +1008,8 @@ def api_process_pdf():
             recommendation = "You are not specified. Pass on this opportunity"
             subject_summary = "Not Specified - Do not Bid!"
 
-        # ✅ Build and convert email body to PDF
+       
+        # build email body with customer project metadata
         email_body = generate_email_body(
             original_subject,
             total_keywords,
@@ -965,12 +1017,20 @@ def api_process_pdf():
             competitor_rows,
             recommendation,
             LOGO_BASE64,
-            ays_id
+            ays_id,
+            highlighted_pdf_key=None,          # no S3 key in this path
+            meta=meta_fields,
+            sections=results.get("sections")   # safe even if None/absent
         )
+
+        
+        # render the email summary PDF from the final HTML
         email_pdf_path = os.path.join(app.config['PROCESSED_FOLDER'], f"{ays_id}_email_summary.pdf")
         html_to_pdf(email_body, email_pdf_path)
 
-        # ✅ Log to dashboard
+
+
+        # log dashboard (unchanged)
         log_results_to_excel(
             ays_id=ays_id,
             from_email=original_receiver,
@@ -979,9 +1039,8 @@ def api_process_pdf():
             recommendation=subject_summary
         )
 
-        # ✅ Rename files based on project name (email subject) before zipping
+        # rename artifacts to project name (unchanged)
         project_name_clean = secure_filename(original_subject)
-
         renamed_files = []
         rename_map = {
             highlighted_pdf_path: f"{project_name_clean}_highlighted.pdf",
@@ -989,75 +1048,26 @@ def api_process_pdf():
             excel_path: f"{project_name_clean}_tables.xlsx",
             email_pdf_path: f"{project_name_clean}_email_summary.pdf"
         }
-
         for old_path, new_filename in rename_map.items():
             new_path = os.path.join(app.config['PROCESSED_FOLDER'], new_filename)
             os.rename(old_path, new_path)
             renamed_files.append(new_path)
 
-        # ✅ Bundle renamed files into a ZIP
-        import zipfile
-        import tempfile
-
+        # zip and return (unchanged)
+        import zipfile, tempfile
         with tempfile.NamedTemporaryFile(delete=False, suffix=".zip") as tmp_zip:
             with zipfile.ZipFile(tmp_zip.name, 'w') as zipf:
                 for file_path in renamed_files:
                     zipf.write(file_path, arcname=os.path.basename(file_path))
-
             zip_download_path = tmp_zip.name
-        
-        zip_name_for_download = f"{project_name_clean}_AYS_Report.zip"
-        return send_file(
-            zip_download_path,
-            as_attachment=True,
-            download_name=zip_name_for_download
-        )
 
+        zip_name_for_download = f"{project_name_clean}_AYS_Report.zip"
+        return send_file(zip_download_path, as_attachment=True, download_name=zip_name_for_download)
 
     except Exception as e:
         logging.error(f"API Exception: {e}", exc_info=True)
         return jsonify({"error": "Internal Server Error"}), 500
 
-
-def log_results_to_excel(from_email, manufacturer_terms, recommendation, ays_id, project_name):
-    dashboard_path = os.path.join(app.root_path, 'data', 'ays_dashboard.xlsx')
-    os.makedirs(os.path.dirname(dashboard_path), exist_ok=True)
-
-    now = datetime.now()
-    timestamp_str = now.strftime('%m/%d/%Y %H:%M')
-
-    new_row = pd.DataFrame([{
-        'AYS ID': ays_id,
-        'Date': timestamp_str,
-        'Email': from_email,
-        'Project Name': project_name,
-        'Manufacturer Terms': ", ".join(manufacturer_terms) if manufacturer_terms else "None",
-        'Recommendation': recommendation
-    }])
-
-
-    logging.debug("📄 New row to add to Excel:")
-    logging.debug(new_row.to_dict(orient="records")[0])
-
-    try:
-        if os.path.exists(dashboard_path):
-            old_df = pd.read_excel(dashboard_path, dtype=str)
-            full_df = pd.concat([old_df, new_row], ignore_index=True)
-        else:
-            full_df = new_row
-
-        # Convert 'Date' column to datetime for safe sorting
-        full_df['Date'] = pd.to_datetime(full_df['Date'], errors='coerce', format='%m/%d/%Y %H:%M')
-        full_df = full_df.sort_values(by='Date', ascending=False)
-
-        # Convert Date back to formatted string for Excel export
-        full_df['Date'] = full_df['Date'].dt.strftime('%m/%d/%Y %H:%M')
-
-        full_df.to_excel(dashboard_path, index=False)
-        logging.info(f"✅ Dashboard updated at {dashboard_path}")
-
-    except Exception as e:
-        logging.error(f"Failed to log to dashboard: {e}", exc_info=True)
 
 @app.route('/dashboard1')
 def view_dashboard():
@@ -1099,12 +1109,12 @@ def view_dashboard():
 
 
 # === UPDATED: /dashboard/download (uses the shared path) ===
-from helpers_async_s3_0_6 import DASHBOARD_XLSX
+from helpers_async_s3_0_9 import DASHBOARD_XLSX
 import tempfile
 from datetime import datetime
 from flask import after_this_request
 try:
-    from helpers_async_s3_0_6 import CUSTOMER_EXPORT_COLUMNS
+    from helpers_async_s3_0_9 import CUSTOMER_EXPORT_COLUMNS
 except ImportError:
     CUSTOMER_EXPORT_COLUMNS = [
         "Date", "AYS ID", "Email", "Project Name", "Manufacturer Terms", "Recommendation"
@@ -1155,7 +1165,7 @@ def download_dashboard_excel():
 
 @app.route('/project')
 def start_project():
-    return render_template('project_submitted1.html')
+    return render_template('project_submitted5.html')
 
 # ---- imports (clean) ----
 import os
@@ -1170,7 +1180,7 @@ from flask import (
 )
 
 # pull everything we use from your helpers module
-from helpers_async_s3_0_6 import (
+from helpers_async_s3_0_9 import (
     # job + pipeline
     make_project_id, submit_job, set_job, get_job, run_pipeline_to_s3,
     # dashboard write + read
@@ -1185,88 +1195,180 @@ AYS_FROM_NAME  = os.getenv("AYS_FROM_NAME",  "AYS Reports")
 AYS_FROM_EMAIL = os.getenv("AYS_FROM_EMAIL", "noreply@areyouspecified.com")
 
 
+
+# === Helpers to render meta fields into the email ===
+def _render_meta_html(meta: dict) -> str:
+    """Return an HTML table for meta_* fields (labels are meta_* without the prefix)."""
+    if not meta:
+        return ""
+    rows = []
+    for k, v in meta.items():
+        if not v:
+            continue
+        label = k.replace("meta_", "").replace("_", " ").title()
+        rows.append(
+            "<tr>"
+            f"<td style='padding:6px 10px;border:1px solid #ddd;white-space:nowrap;'><b>{label}</b></td>"
+            f"<td style='padding:6px 10px;border:1px solid #ddd;'>{v}</td>"
+            "</tr>"
+        )
+    if not rows:
+        return ""
+    return (
+        "<h3 style='margin:16px 0 8px 0;'>Project Details</h3>"
+        "<table cellpadding='0' cellspacing='0' style='border-collapse:collapse;"
+        "font-family:Arial,sans-serif;font-size:13px;'>"
+        f"{''.join(rows)}"
+        "</table><br>"
+    )
+
+def _prepend_meta_to_email(html_body: str, meta: dict) -> str:
+    """Prepend the Project Details table to the email HTML."""
+    meta_html = _render_meta_html(meta or {})
+    return (meta_html + html_body) if meta_html else html_body
+
+
+
 # =========================
 # Project submission (background jobs)
 # =========================
 from datetime import datetime
+import base64
+import logging
+from flask import jsonify, render_template, request
 
 @app.post('/project-process')
 def project_process():
-    subject = request.form.get('Subject') or "Untitled_Project"
-    email   = request.form.get('From')    or "unknown@example.com"
-    files   = request.files.getlist('files')
-    if not files:
-        return jsonify({"error": "No files uploaded"}), 400
+    """
+    Handles project submissions (uploads multiple PDFs + project info)
+    and queues them for background processing.
+    """
+    try:
+        subject = request.form.get('Subject') or "Untitled_Project"
+        email   = request.form.get('From') or "unknown@example.com"
+        files   = request.files.getlist('files')
 
-    project_id = make_project_id(subject)
-    job_ids = []
+        if not files:
+            return jsonify({"error": "No files uploaded"}), 400
 
-    callbacks = dict(
-        process_pdf_file=process_pdf_file,
-        create_highlighted_only_pdf=create_highlighted_only_pdf,
-        generate_email_body=generate_email_body,
-        logo_base64=LOGO_BASE64,
-        write_results_to_excel=write_results_to_excel,  # keep if available
-    )
-
-    submitted_at_iso = datetime.utcnow().isoformat(timespec='seconds') + "Z"
-
-    for file in files:
-        if not file or not file.filename:
-            continue
-
-        payload = {
-            "AttachmentName": file.filename,
-            "AttachmentContent": base64.b64encode(file.read()).decode('utf-8'),
-            "From": email,
-            "Subject": subject,
-            "MessageID": None,
-            "ProjectID": project_id,
-            "SubmittedAt": submitted_at_iso,
+        # Capture project metadata
+        meta_fields = {
+            k: v for k, v in request.form.items()
+            if k.startswith("meta_")
         }
 
-        def job_fn(job_id, payload_inner):
-            try:
-                set_job(job_id, state="STARTED", project_id=payload_inner["ProjectID"])
-                res = run_pipeline_to_s3(
-                    job_id=job_id,
-                    payload=payload_inner,
-                    callbacks=callbacks,
-                    upload_folder=app.config['UPLOAD_FOLDER'],
-                    processed_folder=app.config['PROCESSED_FOLDER'],
-                )
-                set_job(job_id, state="SUCCESS", info=res, project_id=payload_inner["ProjectID"])
+        project_id = make_project_id(subject)
+        job_ids = []
 
-                log_completed_job_row(
-                    ays_id=res["ays_id"],
-                    from_email=payload_inner.get("From") or "",
-                    project_name=payload_inner.get("Subject") or "",
-                    manufacturer_terms=res.get("manufacturer_terms"),
-                    recommendation=res.get("recommendation"),
-                    project_id=res["project_id"],
-                    doc_folder=res["doc_folder"],
-                    zip_key=res["zip_key"],
-                    job_id=job_id,
-                    submitted_at=payload_inner.get("SubmittedAt"),
-                )
-            except Exception as e:
-                logging.exception("Background job failed")
-                set_job(job_id, state="FAILURE", info={"error": str(e)}, project_id=payload_inner["ProjectID"])
+        callbacks = dict(
+            process_pdf_file=process_pdf_file,
+            create_highlighted_only_pdf=create_highlighted_only_pdf,
+            generate_email_body=generate_email_body,
+            logo_base64=LOGO_BASE64,
+            write_results_to_excel=write_results_to_excel,
+        )
 
-        job_id = submit_job(job_fn, payload)
-        job_ids.append(job_id)
+        # One timestamp for this batch (each file still gets its own doc_folder via this)
+        submitted_at_iso = datetime.utcnow().isoformat(timespec='seconds') + "Z"
 
-    set_job(project_id, state="PROJECT", jobs=job_ids, subject=subject)
+        for file in files:
+            if not file or not file.filename:
+                continue
 
-    wants_json = (
-        request.accept_mimetypes.best == 'application/json'
-        or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
-    )
-    return (
-        jsonify({'project_id': project_id, 'job_ids': job_ids})
-        if wants_json
-        else render_template('project_submitted1.html', project_id=project_id, job_ids=job_ids)
-    )
+            # --------------------------
+            # DUPLICATE-SAFE NAMING (LOCAL /uploads)
+            # --------------------------
+            original = file.filename
+            base, ext = os.path.splitext(original)
+            if not ext:
+                ext = ".pdf"
+
+            # Clean the base filename (avoid weird symbols)
+            safe_base = re.sub(r'[^A-Za-z0-9._ -]+', '_', base).strip() or "file"
+
+            # Ask local upload folder for the next available name
+            unique_name = get_next_available_name_local(
+                safe_base,
+                ext,
+                app.config['UPLOAD_FOLDER'],
+            )
+            # --------------------------
+
+            payload = {
+                "AttachmentName": unique_name,  # what we actually write to disk
+                "DisplayName": unique_name,     # what we log/display on dashboard
+                "AttachmentContent": base64.b64encode(file.read()).decode('utf-8'),
+                "From": email,
+                "Subject": subject,
+                "MessageID": None,
+                "ProjectID": project_id,
+                "SubmittedAt": submitted_at_iso,
+                "Meta": meta_fields,
+            }
+
+            def job_fn(job_id, payload_inner):
+                try:
+                    set_job(job_id, state="STARTED", project_id=project_id)
+
+                    res = run_pipeline_to_s3(
+                        job_id=job_id,
+                        payload=payload_inner,
+                        callbacks=callbacks,
+                        upload_folder=app.config["UPLOAD_FOLDER"],
+                        processed_folder=app.config["PROCESSED_FOLDER"],
+                    )
+
+                    set_job(job_id, state="SUCCESS", info=res, project_id=project_id)
+
+                    log_completed_job_row(
+                        ays_id=res["ays_id"],
+                        from_email=payload_inner.get("From") or "",
+                        project_name=payload_inner.get("Subject") or "",
+                        manufacturer_terms=res.get("manufacturer_terms"),
+                        recommendation=res.get("recommendation"),
+                        project_id=res["project_id"],
+                        doc_folder=res["doc_folder"],
+                        zip_key=res["zip_key"],
+                        job_id=job_id,
+                        submitted_at=payload_inner.get("SubmittedAt"),
+                        meta_fields=payload_inner.get("Meta") or {},
+                        pages_processed=res.get("pages_processed"),
+                        attachment_name=res.get("display_name"),  # NEW: show on dashboard
+                    )
+                except Exception as e:
+                    logging.exception("Background job failed")
+                    set_job(
+                        job_id,
+                        state="FAILURE",
+                        info={"error": str(e)},
+                        project_id=payload_inner["ProjectID"],
+                    )
+
+            job_id = submit_job(job_fn, payload)
+            job_ids.append(job_id)
+
+        # project-level job bundle marker
+        set_job(project_id, state="PROJECT", jobs=job_ids, subject=subject)
+
+        wants_json = (
+            request.accept_mimetypes.best == 'application/json'
+            or request.headers.get('X-Requested-With') == 'XMLHttpRequest'
+        )
+
+        return (
+            jsonify({'project_id': project_id, 'job_ids': job_ids})
+            if wants_json
+            else render_template(
+                'project_submitted5.html',
+                project_id=project_id,
+                job_ids=job_ids
+            )
+        )
+
+    except Exception as e:
+        logging.exception("Error in project_process")
+        return jsonify({"error": str(e)}), 500
+
 
 
 # =========================
@@ -1368,7 +1470,17 @@ def api_explorer():
     return jsonify(s3_list_dir(path))
 
 
-from helpers_async_s3_0_6 import list_projects_from_dashboard, get_project_meta, list_project_docs, s3_presign_get, S3_RESULTS_PREFIX, S3_UPLOAD_PREFIX, generate_email_body, s3_list_dir
+from helpers_async_s3_0_9 import (
+    list_projects_from_dashboard,
+    get_project_meta,
+    list_project_docs,
+    s3_presign_get,
+    S3_RESULTS_PREFIX,
+    S3_UPLOAD_PREFIX,
+    generate_email_body,
+    s3_list_dir,
+    update_project_meta_row,   # <-- NEW
+)
 
 # --- Flask app: Explorer endpoints (REPLACE) ---
 from flask import jsonify, render_template, redirect, abort
@@ -1378,29 +1490,95 @@ import pandas as pd
 # Page
 @app.route('/dashboard')
 def explorer_page():
-    return render_template('explorer_chat_email4.html')  # use the old look template name
+    return render_template('explorer_chat_email15.html')  # use the old look template name
 
-# Projects list (newest first)
+from data.bid_status_store import get_all_bid_status
+
 @app.get('/api/explorer/projects')
 def api_explorer_projects():
     items = list_projects_from_dashboard()
+
+    # Load once (fast) so we don't lock/read the json file for every project row
+    bid_map = get_all_bid_status()
+
+    # Attach status to each project item
+    for p in items:
+        pid = str(p.get("project_id", "")).strip()
+        rec = bid_map.get(pid) or {}
+        p["bid_status"] = rec.get("bid_status", "")
+        p["bid_updated_by"] = rec.get("updated_by", "")
+        p["bid_updated_at"] = rec.get("updated_at", "")
+
     return jsonify(items)
 
 # Docs for a project, with preview (inline) and attachments (download)
 @app.get('/api/explorer/<project_id>/docs')
 def api_explorer_docs(project_id):
-    meta = get_project_meta(project_id) or {
+    """
+    Return:
+      {
+        "project": {
+           "project_id": ...,
+           "project_name": ...,
+           "email": ...,
+           "date": ...,
+           "meta_bid_date": ...,
+           "meta_drawing_date": ...,
+           "meta_address": ...,
+           "meta_engineer": ...,
+           "meta_general_contractor": ...,
+           "meta_notes": ...
+        },
+        "docs": [ ... ]
+      }
+    This mirrors the meta fields used by /confirm-send.
+    """
+    # ----- 1) Build base project meta (fallbacks) -----
+    meta = {
         "project_id": project_id,
         "project_name": project_id.split("_AYS-")[0].replace("_", " "),
         "email": "",
         "date": "",
+        "meta_bid_date": "",
+        "meta_drawing_date": "",
+        "meta_address": "",
+        "meta_engineer": "",
+        "meta_general_contractor": "",
+        "meta_notes": "",
     }
-    raw_docs = list_project_docs(project_id)  # [{doc_folder, artifacts:{...}}]
 
-    def wrap_dl(key):   # for downloads
+    # ----- 2) Hydrate from DASHBOARD_XLSX, same as /confirm-send -----
+    try:
+        if project_id and os.path.isfile(DASHBOARD_XLSX):
+            df = pd.read_excel(DASHBOARD_XLSX, dtype=str).fillna("")
+
+            if "Project ID" in df.columns:
+                df = df[df["Project ID"].astype(str) == str(project_id)]
+
+            if not df.empty:
+                row = df.tail(1).iloc[0]
+
+                meta["project_name"] = row.get("Project Name", meta["project_name"])
+                meta["email"]       = row.get("Email", "")
+                meta["date"]        = row.get("Date", "")
+
+                # same column → meta_* mapping as /confirm-send
+                meta["meta_bid_date"]           = row.get("Bid Date", "")
+                meta["meta_drawing_date"]       = row.get("Drawing Date", "")
+                meta["meta_address"]            = row.get("Address", "")
+                meta["meta_engineer"]           = row.get("Engineer", "")
+                meta["meta_general_contractor"] = row.get("General Contractor", "")
+                meta["meta_notes"]              = row.get("Notes", "")
+    except Exception:
+        logging.exception("api_explorer_docs: failed to read dashboard workbook")
+
+    # ----- 3) List docs from S3 (unchanged logic) -----
+    raw_docs = list_project_docs(project_id)  # [{doc_folder, artifacts:{...}, ...}]
+
+    def wrap_dl(key):
         return f"/get?key={urllib.parse.quote(key)}" if key else None
 
-    def wrap_view(key): # for inline in <iframe>
+    def wrap_view(key):
         return f"/view/by-key?key={urllib.parse.quote(key)}" if key else None
 
     docs = []
@@ -1408,32 +1586,48 @@ def api_explorer_docs(project_id):
         folder = d["doc_folder"]
         a = d.get("artifacts") or {}
 
-        # Attachments (download in new tab)
+        # Optional extra info from list_project_docs, if present
+        submitted_at_display = d.get("submitted_at_display") or d.get("submitted_at") or ""
+        attachment_name      = d.get("attachment_name") or folder
+
+        # Attachments
         attachments = []
-        if a.get("zip"):             attachments.append({"label": "Report ZIP",          "href": wrap_dl(a["zip"]),             "ext": "zip"})
-        if a.get("tables"):          attachments.append({"label": "Tables.xlsx",         "href": wrap_dl(a["tables"]),          "ext": "xlsx"})
-        if a.get("highlighted"):     attachments.append({"label": "Highlighted.pdf",     "href": wrap_dl(a["highlighted"]),     "ext": "pdf"})
-        if a.get("only_highlights"): attachments.append({"label": "Highlights-only.pdf", "href": wrap_dl(a["only_highlights"]), "ext": "pdf"})
-        if a.get("email_pdf"):       attachments.append({"label": "Email Summary.pdf",   "href": wrap_dl(a["email_pdf"]),       "ext": "pdf"})
+        if a.get("zip"):
+            attachments.append({"label": "Report ZIP", "href": wrap_dl(a["zip"]), "ext": "zip"})
+        if a.get("tables"):
+            attachments.append({"label": "Tables.xlsx", "href": wrap_dl(a["tables"]), "ext": "xlsx"})
+        if a.get("highlighted"):
+            attachments.append({"label": "Highlighted.pdf", "href": wrap_dl(a["highlighted"]), "ext": "pdf"})
+        if a.get("only_highlights"):
+            attachments.append({"label": "Highlights-only.pdf", "href": wrap_dl(a["only_highlights"]), "ext": "pdf"})
+        if a.get("email_pdf"):
+            attachments.append({"label": "Email Summary.pdf", "href": wrap_dl(a["email_pdf"]), "ext": "pdf"})
 
         docs.append({
             "doc_folder": folder,
+            "attachment_name": attachment_name,
+            "submitted_at_display": submitted_at_display,
             "subject": f"{meta['project_name'] or 'Project'} — {folder} summary",
             "email_meta": {
                 "from_name": AYS_FROM_NAME,
                 "from_email": AYS_FROM_EMAIL,
-                "to_email": meta.get("email",""),
-                "date": meta.get("date",""),
+                "to_email": meta.get("email", ""),
+                "date": meta.get("date", ""),
             },
             "preview": {
-                # prefer HTML if you ever upload; otherwise render the PDF inline in iframe
                 "html": wrap_view(a.get("email_html")),
                 "pdf":  wrap_view(a.get("email_pdf")),
             },
             "attachments": attachments,
         })
+        
+    bid_rec = get_bid_status(project_id) or {}
+    meta["bid_status"] = bid_rec.get("bid_status", "")
+    meta["bid_updated_by"] = bid_rec.get("updated_by", "")
+    meta["bid_updated_at"] = bid_rec.get("updated_at", "")
 
-    return jsonify({ "project": meta, "docs": docs })
+    return jsonify({"project": meta, "docs": docs})
+
 
 # Always-inline view (PDF/HTML) for iframe
 @app.get("/view/by-key")
@@ -1474,6 +1668,78 @@ def view_by_key():
         return jsonify({"error": "presign failed"}), 500
 
 
+
+    
+@app.get("/confirm-send")
+def job_confirm_send():
+    """
+    Loads the confirm_send_popup.html form in an iframe so the user
+    can review/edit the job info, manufacturer terms, and project meta
+    (bid date, address, etc.) for a single doc.
+    """
+    project_id = (request.args.get("project_id") or "").strip()
+    doc_folder = (request.args.get("doc_folder") or "").strip()
+
+    # Base context with all fields your popup template can use
+    ctx = {
+        "project_id": project_id,
+        "doc_folder": doc_folder,
+        "project_name": "",
+        "email": "",
+        "date": "",
+        "ays_id": "",
+        "manufacturer_terms": "",
+        "recommendation": "",
+        # NEW: meta_* fields for project details
+        "meta_bid_date": "",
+        "meta_drawing_date": "",
+        "meta_address": "",
+        "meta_engineer": "",
+        "meta_general_contractor": "",
+        "meta_notes": "",
+    }
+
+    try:
+        if project_id and os.path.isfile(DASHBOARD_XLSX):
+            df = pd.read_excel(DASHBOARD_XLSX, dtype=str).fillna("")
+
+            # filter by project
+            if "Project ID" in df.columns:
+                df = df[df["Project ID"].astype(str) == project_id]
+
+            # further filter by doc folder if present
+            if doc_folder and "Doc Folder" in df.columns:
+                df = df[df["Doc Folder"].astype(str) == doc_folder]
+
+            if not df.empty:
+                # last matching row for this project/doc_folder
+                row = df.tail(1).iloc[0]
+
+                ctx.update(
+                    {
+                        "project_name": row.get("Project Name", ""),
+                        "email": row.get("Email", ""),
+                        "date": row.get("Date", ""),
+                        "ays_id": row.get("AYS ID", ""),
+                        "manufacturer_terms": row.get("Manufacturer Terms", ""),
+                        "recommendation": row.get("Recommendation", ""),
+                        # Map Excel columns → template variables (meta_*)
+                        # These columns will exist once you log them from log_completed_job_row
+                        "meta_bid_date": row.get("Bid Date", ""),
+                        "meta_drawing_date": row.get("Drawing Date", ""),
+                        "meta_address": row.get("Address", ""),
+                        "meta_engineer": row.get("Engineer", ""),
+                        "meta_general_contractor": row.get("General Contractor", ""),
+                        "meta_notes": row.get("Notes", ""),
+                    }
+                )
+    except Exception:
+        logging.exception("Confirm and Send: failed to read dashboard workbook")
+
+    return render_template("confirm_send_popup.html", **ctx)
+
+
+
 # Generic download by exact S3 key (used by attachment buttons)
 @app.get('/get')
 def get_by_key():
@@ -1499,6 +1765,683 @@ def dl_by_key():
     except Exception:
         logging.exception("presign failed")
         return jsonify({"error": "presign failed"}), 500
+
+@app.get("/section/dl")
+def section_dl_by_key():
+    """
+    Dynamically slice a section from the highlighted PDF in S3 and download it.
+
+    Query params:
+      - key:   S3 key of the highlighted PDF (must be under results/)
+      - start: 1-based start page (inclusive)
+      - stop:  1-based stop page (inclusive)
+    """
+    key = (request.args.get("key") or "").lstrip("/")
+    start = request.args.get("start", type=int)
+    stop  = request.args.get("stop",  type=int)
+
+    if not key or ".." in key:
+        return jsonify({"error": "bad key"}), 400
+    if not key.startswith(f"{S3_RESULTS_PREFIX}/"):
+        # Only allow section slicing on results artifacts
+        return jsonify({"error": "forbidden key"}), 403
+
+    if not start or start < 1:
+        return jsonify({"error": "invalid start page"}), 400
+    if not stop or stop < start:
+        stop = start  # treat as single-page section if stop is missing/bad
+
+    try:
+        # Fetch highlighted PDF from S3
+        obj = _s3.get_object(Bucket=S3_BUCKET, Key=key)
+        pdf_bytes = obj["Body"].read()
+
+        reader = PdfReader(io.BytesIO(pdf_bytes))
+        writer = PdfWriter()
+
+        num_pages = len(reader.pages)
+        s = max(1, start)
+        e = min(stop, num_pages)
+
+        for p in range(s - 1, e):
+            writer.add_page(reader.pages[p])
+
+        buf = io.BytesIO()
+        writer.write(buf)
+        buf.seek(0)
+
+        filename = f"Section_p{s}_to_p{e}.pdf"
+        return send_file(
+            buf,
+            mimetype="application/pdf",
+            as_attachment=True,
+            download_name=filename,
+        )
+
+    except Exception as e:
+        logging.exception("section_dl_by_key failed")
+        return jsonify({"error": "failed to slice section"}), 500
+
+
+@app.post("/project/<project_id>/update-meta")
+def project_update_meta(project_id):
+    """
+    Update a project's job name + meta fields (address, engineer, etc.)
+    across all rows for that Project ID in the dashboard.
+
+    Accepts either JSON or form-encoded data.
+
+    Expected keys:
+      - Subject or project_name  (new Job Name)
+      - Email or email
+      - any number of meta_* fields (meta_bid_date, meta_address, meta_engineer, ...)
+    """
+    try:
+        if request.is_json:
+            data = request.get_json() or {}
+            project_name = data.get("Subject") or data.get("project_name")
+            email = data.get("Email") or data.get("email")
+            meta_fields = {k: v for k, v in data.items() if k.startswith("meta_")}
+        else:
+            project_name = request.form.get("Subject") or request.form.get("project_name")
+            email = request.form.get("Email") or request.form.get("email")
+            meta_fields = {k: v for k, v in request.form.items() if k.startswith("meta_")}
+
+        updated = update_project_meta_row(
+            project_id=project_id,
+            project_name=project_name,
+            email=email,
+            meta_fields=meta_fields,
+        )
+
+        # Also keep the in-memory job record subject in sync, if present
+        rec = get_job(project_id)
+        if rec and project_name:
+            set_job(project_id, subject=project_name)
+
+        if not updated:
+            return jsonify({"ok": False, "message": "No rows updated for this Project ID"}), 404
+
+        return jsonify({"ok": True, "project_id": project_id})
+
+    except Exception as e:
+        logging.exception("project_update_meta failed")
+        return jsonify({"ok": False, "error": str(e)}), 500
+
+@app.get("/project/<project_id>/edit")
+def edit_project(project_id):
+    """
+    Load an existing project's info + meta fields from the dashboard
+    and render an edit form (reusing project_submitted3.html).
+    """
+    ctx = {
+        "project_id": project_id,
+        "project_name": "",
+        "email": "",
+        "date": "",
+        # same meta_* names you already use elsewhere
+        "meta_bid_date": "",
+        "meta_drawing_date": "",
+        "meta_address": "",
+        "meta_engineer": "",
+        "meta_general_contractor": "",
+        "meta_notes": "",
+        "mode": "edit",   # let the template know this is EDIT mode
+    }
+
+    try:
+        if os.path.isfile(DASHBOARD_XLSX):
+            df = pd.read_excel(DASHBOARD_XLSX, dtype=str).fillna("")
+            if "Project ID" in df.columns:
+                rows = df[df["Project ID"].astype(str) == str(project_id)]
+                if not rows.empty:
+                    row = rows.tail(1).iloc[0]
+
+                    ctx["project_name"] = row.get("Project Name", "")
+                    ctx["email"] = row.get("Email", "")
+                    ctx["date"] = row.get("Date", "")
+
+                    # map visible columns -> meta_* fields
+                    ctx["meta_bid_date"] = row.get("Bid Date", "")
+                    ctx["meta_drawing_date"] = row.get("Drawing Date", "")
+                    ctx["meta_address"] = row.get("Address", "")
+                    ctx["meta_engineer"] = row.get("Engineer", "")
+                    ctx["meta_general_contractor"] = row.get("General Contractor", "")
+                    ctx["meta_notes"] = row.get("Notes", "")
+    except Exception:
+        logging.exception("edit_project: failed to read dashboard workbook")
+
+    return render_template("project_submitted5.html", **ctx)
+
+
+from helpers_async_s3_0_9 import get_next_available_name_local
+
+@app.post("/project/<project_id>/add-doc")
+def add_doc_to_project(project_id):
+    """
+    Upload one or more PDFs into an existing project.
+    This mirrors /project-process so:
+      - duplicate filenames get auto-renamed
+      - pages get counted
+      - dashboard logs correctly
+    """
+    try:
+        files = request.files.getlist("files")
+        if not files:
+            return jsonify({"error": "No files uploaded"}), 400
+
+        # Reuse/override project details from form
+        subject = request.form.get("Subject") or "Untitled_Project"
+        email   = request.form.get("From") or "unknown@example.com"
+
+        # Project metadata
+        meta_fields = {
+            k: v for k, v in request.form.items()
+            if k.startswith("meta_")
+        }
+
+        job_ids = []
+
+        callbacks = dict(
+            process_pdf_file=process_pdf_file,
+            create_highlighted_only_pdf=create_highlighted_only_pdf,
+            generate_email_body=generate_email_body,
+            logo_base64=LOGO_BASE64,
+            write_results_to_excel=write_results_to_excel,
+        )
+
+        submitted_at_iso = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+        for file in files:
+            if not file or not file.filename:
+                continue
+
+            # --------------------------
+            # SAME NAMING LOGIC AS /project-process
+            # --------------------------
+            original = file.filename
+            base, ext = os.path.splitext(original)
+            if not ext:
+                ext = ".pdf"
+
+            safe_base = re.sub(r'[^A-Za-z0-9._ -]+', '_', base).strip() or "file"
+
+            unique_name = get_next_available_name_local(
+                safe_base,
+                ext,
+                app.config["UPLOAD_FOLDER"],
+            )
+            # --------------------------
+
+            payload = {
+                "AttachmentName": unique_name,
+                "DisplayName": unique_name,
+                "AttachmentContent": base64.b64encode(file.read()).decode("utf-8"),
+                "From": email,
+                "Subject": subject,
+                "MessageID": None,
+                "ProjectID": project_id,
+                "SubmittedAt": submitted_at_iso,
+                "Meta": meta_fields,
+            }
+
+            def job_fn(job_id, payload_inner):
+                try:
+                    set_job(job_id, state="STARTED", project_id=project_id)
+
+                    res = run_pipeline_to_s3(
+                        job_id=job_id,
+                        payload=payload_inner,
+                        callbacks=callbacks,
+                        upload_folder=app.config["UPLOAD_FOLDER"],
+                        processed_folder=app.config["PROCESSED_FOLDER"],
+                    )
+
+                    set_job(job_id, state="SUCCESS", info=res, project_id=project_id)
+
+                    log_completed_job_row(
+                        ays_id=res["ays_id"],
+                        from_email=payload_inner.get("From") or "",
+                        project_name=payload_inner.get("Subject") or "",
+                        manufacturer_terms=res.get("manufacturer_terms"),
+                        recommendation=res.get("recommendation"),
+                        project_id=res["project_id"],
+                        doc_folder=res["doc_folder"],
+                        zip_key=res["zip_key"],
+                        job_id=job_id,
+                        submitted_at=payload_inner.get("SubmittedAt"),
+                        meta_fields=payload_inner.get("Meta") or {},
+                        pages_processed=res.get("pages_processed"),
+                        attachment_name=res.get("display_name"),  # NEW
+                    )
+                except Exception as e:
+                    logging.exception("Background job failed")
+                    set_job(
+                        job_id,
+                        state="FAILURE",
+                        info={"error": str(e)},
+                        project_id=project_id,
+                    )
+
+            job_id = submit_job(job_fn, payload)
+            job_ids.append(job_id)
+
+        # Mark project as having new jobs
+        set_job(project_id, state="PROJECT", jobs=job_ids)
+
+        return jsonify({"ok": True, "project_id": project_id, "job_ids": job_ids})
+
+    except Exception as e:
+        logging.exception("Error in add_doc_to_project")
+        return jsonify({"error": str(e)}), 500
+
+
+
+from helpers_async_s3_0_9 import delete_project_doc_s3
+
+from flask import jsonify, current_app  # if not already imported
+
+@app.post("/api/project/<project_id>/docs/<doc_folder>/delete")
+def api_delete_project_doc(project_id, doc_folder):
+    """
+    Delete a project's document folder from S3:
+      results/<project_id>/<doc_folder>/...
+
+    Called by the Explorer UI when the user clicks the trash icon
+    on a document row.
+    """
+    try:
+        result = delete_project_doc_s3(project_id, doc_folder)
+        return jsonify({
+            "ok": True,
+            "project_id": project_id,
+            "doc_folder": doc_folder,
+            **result,
+        })
+    except Exception as exc:
+        current_app.logger.exception(
+            "api_delete_project_doc: failed for project_id=%s doc_folder=%s",
+            project_id, doc_folder,
+        )
+        return jsonify({
+            "ok": False,
+            "project_id": project_id,
+            "doc_folder": doc_folder,
+            "error": str(exc),
+        }), 500
+    
+@app.route("/api/usage_stats")
+def api_usage_stats():
+    try:
+        stats = get_usage_stats()
+        return jsonify(stats)
+    except Exception as e:
+        current_app.logger.exception("Usage stats failed")
+        return jsonify({"error": "failed to compute usage stats"}), 500
+
+from flask import request, jsonify
+from data.bid_status_store import set_bid_status, get_bid_status
+
+@app.route("/api/bid-status", methods=["POST"])
+def api_set_bid_status():
+    payload = request.get_json(force=True) or {}
+
+    job_id = str(payload.get("job_id", "")).strip()
+    bid_status = str(payload.get("bid_status", "")).strip()
+    project_name = str(payload.get("project_name", "")).strip()
+
+    if not job_id:
+        return jsonify({"success": False, "error": "Missing job_id"}), 400
+
+    # Pick the best "who" you have available.
+    # If you have a login system, replace this with your user identity.
+    updated_by = session.get("user") or payload.get("updated_by") or request.headers.get("X-User") or "user"
+
+
+    record = set_bid_status(
+        job_id=job_id,
+        project_name=project_name,
+        bid_status=bid_status,
+        updated_by=str(updated_by),
+    )
+
+    return jsonify({"success": True, "record": record})
+
+
+@app.route("/api/bid-status/<job_id>", methods=["GET"])
+def api_get_bid_status(job_id):
+    rec = get_bid_status(str(job_id).strip())
+    return jsonify({"success": True, "record": rec})
+
+@app.get("/api/version")
+def api_version():
+    return jsonify({"version": os.environ.get("AYS_VERSION", "3.4.27")})
+
+# =========================
+# CONFIG UPLOAD + ROUTER
+# =========================
+
+from io import BytesIO
+from flask import request, send_file, Response, render_template, flash, redirect, url_for
+
+from kcc_parser1 import convert_kcc_pdf_to_xlsx_bytes
+from valent_parser1 import convert_valent_pdf_to_xlsx_bytes
+from innovent_parser2 import convert_innovent_pdf_to_xlsx_bytes
+from multistack_parser1 import convert_multistack_pdf_to_xlsx_bytes
+from aaon_parser1 import convert_aaon_pdf_to_xlsx_bytes
+
+CONFIG_CONVERTERS = {
+    "kcc": convert_kcc_pdf_to_xlsx_bytes,
+    "valent": convert_valent_pdf_to_xlsx_bytes,
+    "innovent": convert_innovent_pdf_to_xlsx_bytes,
+    "multistack": convert_multistack_pdf_to_xlsx_bytes,
+    "aaon": convert_aaon_pdf_to_xlsx_bytes,
+    # "trane": convert_trane_pdf_to_xlsx_bytes,
+    # "aaon": convert_aaon_pdf_to_xlsx_bytes,
+}
+
+@app.route("/config", methods=["GET"])
+def config_page():
+    return render_template("config_upload1.html")
+
+
+@app.route("/config", methods=["POST"])
+def config_router():
+    manufacturer = (request.form.get("manufacturer") or "").strip().lower()
+
+    if manufacturer in CONFIG_CONVERTERS:
+        return config_run()  # ✅ CALL DIRECTLY (no redirect)
+
+    flash(f"'{manufacturer or 'unknown'}' is not implemented yet.", "error")
+    return redirect(url_for("config_page"))
+
+
+
+@app.route("/config/run", methods=["POST"])
+def config_run():
+    app.logger.info(
+        "CONFIG/RUN HIT ✅ method=%s content_type=%s",
+        request.method,
+        request.content_type
+    )
+    app.logger.info(
+        "CONFIG/RUN form keys=%s files=%s",
+        list(request.form.keys()),
+        list(request.files.keys())
+    )
+
+    try:
+        job_name = (request.form.get("job_name") or "").strip()
+        manufacturer = (request.form.get("manufacturer") or "").strip().lower()
+        output_type = (request.form.get("output_type") or "all_in_one").strip().lower()
+        pdf = request.files.get("pdf_file")
+
+        app.logger.info(
+            "CONFIG/RUN parsed job_name=%r manufacturer=%r output_type=%r pdf=%s",
+            job_name,
+            manufacturer,
+            output_type,
+            getattr(pdf, "filename", None)
+        )
+
+        if manufacturer not in CONFIG_CONVERTERS:
+            app.logger.warning("CONFIG/RUN manufacturer not supported: %r", manufacturer)
+            return Response(f"Manufacturer '{manufacturer}' not supported.", status=400)
+
+        if output_type not in ("all_in_one", "shopping_list"):
+            app.logger.warning("CONFIG/RUN unsupported output_type: %r", output_type)
+            return Response("Unsupported output type.", status=400)
+
+        if not pdf or not pdf.filename:
+            app.logger.warning("CONFIG/RUN missing pdf_file upload")
+            return Response("Missing PDF upload.", status=400)
+
+        pdf_bytes = pdf.read()
+        app.logger.info("CONFIG/RUN read pdf bytes=%d", len(pdf_bytes))
+
+        converter_fn = CONFIG_CONVERTERS[manufacturer]
+
+        app.logger.info("CONFIG/RUN calling converter=%s...", getattr(converter_fn, "__name__", str(converter_fn)))
+        xlsx_bytes, filename_from_func = converter_fn(
+            pdf_bytes=pdf_bytes,
+            job_name=job_name,
+            output_type=output_type,
+        )
+
+        if hasattr(xlsx_bytes, "getvalue"):
+            xlsx_bytes = xlsx_bytes.getvalue()
+
+        app.logger.info(
+            "CONFIG/RUN convert returned bytes=%d filename=%s",
+            len(xlsx_bytes),
+            filename_from_func
+        )
+
+        out = BytesIO(xlsx_bytes)
+        out.seek(0)
+
+        # Safe download name
+        safe_job = "".join(c for c in job_name if c.isalnum() or c in (" ", "-", "_")).strip() or "job"
+        filename = f"{safe_job}_{manufacturer}_{output_type}_template_output.xlsx".replace(" ", "_")
+
+        resp = send_file(
+            out,
+            as_attachment=True,
+            download_name=filename,
+            mimetype=(
+                "application/vnd.openxmlformats-officedocument."
+                "spreadsheetml.sheet"
+            ),
+            max_age=0
+        )
+        resp.headers["Cache-Control"] = "no-store"
+        resp.headers["X-AYS-Config"] = manufacturer
+        resp.headers["X-AYS-OutputType"] = output_type
+
+        app.logger.info("CONFIG/RUN returning download filename=%s", filename)
+        return resp
+
+    except Exception:
+        app.logger.exception("CONFIG/RUN FAILED")
+        return Response("Conversion failed (see server logs).", status=500)
+
+
+
+# =========================
+# Schedule (Textract) Routes
+# =========================
+# NEW helper dedicated to schedules
+import helpers_schedule_textract_0_1 as sch
+
+
+# -------------------------
+# Schedule upload page
+# -------------------------
+@app.route("/schedule", methods=["GET"])
+def schedule_upload_page():
+    return render_template("schedule_upload.html")
+
+
+# -------------------------
+# Schedule submit API
+# -------------------------
+@app.route("/api/process-schedule", methods=["POST"])
+def api_process_schedule():
+    logging.warning("✅ HIT /api/process-schedule")
+
+    # 1) Get uploaded PDF(s) — UI uses field name "files"
+    uploaded_files = []
+    if "files" in request.files:
+        uploaded_files = request.files.getlist("files")
+    else:
+        # fallback support
+        f = (
+            request.files.get("file")
+            or request.files.get("pdf")
+            or request.files.get("schedule_pdf")
+        )
+        if f:
+            uploaded_files = [f]
+
+    uploaded_files = [f for f in uploaded_files if f and f.filename]
+
+    if not uploaded_files:
+        logging.error("❌ No file found. request.files keys=%s", list(request.files.keys()))
+        return jsonify({
+            "ok": False,
+            "error": "No PDF file uploaded. Expected form field name 'files'."
+        }), 400
+
+    # For now: first PDF only
+    f = uploaded_files[0]
+    filename = secure_filename(f.filename)
+    pdf_bytes = f.read()
+
+    if not pdf_bytes:
+        logging.error("❌ Uploaded PDF is empty.")
+        return jsonify({"ok": False, "error": "Uploaded PDF is empty."}), 400
+
+    # 2) Metadata fields
+    project_name = (request.form.get("project_name") or request.form.get("subject") or "Schedule").strip()
+    project_id = (request.form.get("project_id") or "").strip() or None
+    customer_email = (request.form.get("email") or "").strip()
+    notes = (request.form.get("notes") or "").strip()
+    schedule_type = (request.form.get("schedule_type") or "").strip()
+
+    submitted_at = datetime.utcnow().isoformat(timespec="seconds") + "Z"
+
+    # 3) Build payload expected by schedule helper
+    payload = {
+        "Subject": project_name,
+        "ProjectID": project_id,
+        "AttachmentName": filename,
+        "DisplayName": filename,
+        "SubmittedAt": submitted_at,
+        "AttachmentContent": base64.b64encode(pdf_bytes).decode("utf-8"),
+        "Meta": {
+            "meta_email": customer_email,
+            "meta_notes": notes,
+            "meta_schedule_type": schedule_type,
+        },
+    }
+
+    # 4) Submit background job
+    job_id = sch.submit_job(
+        sch.run_schedule_pipeline_to_s3,
+        payload=payload,
+    )
+
+    logging.warning("🚀 Schedule job queued job_id=%s project=%s file=%s", job_id, project_name, filename)
+
+    return jsonify({
+        "ok": True,
+        "job_id": job_id,
+        "project_id": project_id,   # may be None; helper will generate final
+        "message": "Schedule submitted successfully."
+    }), 202
+
+
+# -------------------------
+# Schedule job status
+# -------------------------
+@app.route("/api/schedule/status/<job_id>", methods=["GET"])
+def api_schedule_status(job_id):
+    """
+    Poll status for a schedule job.
+    """
+    job = sch.get_job(job_id) or {}
+    state = job.get("state", "UNKNOWN")
+    info = job.get("info", {}) or {}
+
+    # Provide a clean status payload for UI
+    return jsonify({
+        "ok": True,
+        "job_id": job_id,
+        "state": state,
+        "step": info.get("step"),
+        "error": info.get("error"),
+        "result": job.get("result"),          # populated when DONE
+        "preview": job.get("preview"),        # lightweight preview for HTML table
+    })
+
+
+# -------------------------
+# Schedule preview API (for UI table popup)
+# -------------------------
+@app.route("/api/schedule/preview/<job_id>", methods=["GET"])
+def api_schedule_preview(job_id):
+    """
+    Returns a lightweight preview structure:
+      {
+        "pages": [
+          {"page": 1, "tables": [{"table_index": 1, "grid": [[...],[...]]}, ...]},
+          ...
+        ]
+      }
+    """
+    job = sch.get_job(job_id) or {}
+    if job.get("state") != "DONE":
+        return jsonify({
+            "ok": False,
+            "error": "Schedule output not ready.",
+            "state": job.get("state", "UNKNOWN"),
+        }), 409
+
+    preview = job.get("preview")
+    if not preview:
+        return jsonify({"ok": False, "error": "No preview available."}), 404
+
+    return jsonify({"ok": True, "preview": preview})
+
+
+# -------------------------
+# Schedule Excel download
+# -------------------------
+@app.route("/schedule/dl/<job_id>", methods=["GET"])
+def schedule_download(job_id):
+    """
+    Download the extracted schedule Excel via presigned S3 URL.
+    """
+    job = sch.get_job(job_id) or {}
+    result = job.get("result") or {}
+    excel_key = result.get("excel_key")
+
+    if not excel_key:
+        return "Schedule output not ready.", 404
+
+    url = sch.s3_presign_get(excel_key, expires=3600)
+    return redirect(url)
+
+
+# -------------------------
+# Schedule ZIP download (optional)
+# -------------------------
+@app.route("/schedule/zip/<job_id>", methods=["GET"])
+def schedule_download_zip(job_id):
+    job = sch.get_job(job_id) or {}
+    result = job.get("result") or {}
+    zip_key = result.get("zip_key")
+    if not zip_key:
+        return "Schedule ZIP not ready.", 404
+    url = sch.s3_presign_get(zip_key, expires=3600)
+    return redirect(url)
+
+
+# -------------------------
+# Schedule project view
+# -------------------------
+@app.route("/schedule/project/<project_id>", methods=["GET"])
+def schedule_project_view(project_id):
+    """
+    View all processed schedule artifacts for a project.
+    """
+    items = sch.list_schedule_project_docs(project_id)  # alias exists in helper now
+    return render_template(
+        "schedule_project.html",
+        project_id=project_id,
+        items=items,
+    )
+
 
 
 if __name__ == "__main__":

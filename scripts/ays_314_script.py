@@ -34,7 +34,7 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(PROCESSED_FOLDER, exist_ok=True)
 
 # Load the spaCy model
-model_path = Path(__file__).parent / 'static/en_core_web_sm'
+model_path = Path(__file__).parent.parent / 'static/en_core_web_sm'
 nlp = spacy.load(model_path)
 
 # Initialize global variables

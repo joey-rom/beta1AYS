@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Review &amp; Send Job</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <style>
+    body {
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+      margin: 0;
+      padding: 16px;
+      background: #f7f7f8;
+      color: #111;
+    }
+    .wrap {
+      max-width: 700px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 12px;
+      border: 1px solid #e2e2e4;
+      padding: 16px 18px 18px;
+      box-sizing: border-box;
+    }
+    h2 {
+      margin: 0 0 8px;
+      font-size: 1.1rem;
+    }
+    p.sub {
+      margin: 0 0 14px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px 16px;
+    }
+    .field {
+      margin-bottom: 10px;
+    }
+    label {
+      display: block;
+      font-size: 0.82rem;
+      font-weight: 600;
+      color: #444;
+      margin-bottom: 4px;
+    }
+    input[type="text"],
+    input[type="email"],
+    textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 7px 9px;
+      border-radius: 8px;
+      border: 1px solid #d2d5da;
+      font-size: 0.9rem;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 80px;
+    }
+    .row {
+      display: flex;
+      justify-content: flex-end;
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .btn {
+      border-radius: 8px;
+      padding: 7px 14px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .btn-secondary {
+      background: #f2f2f3;
+      border-color: #d5d5d8;
+      color: #333;
+    }
+    .btn-secondary:hover {
+      filter: brightness(0.98);
+    }
+    .btn-primary {
+      background: #4CAF50;
+      color: #fff;
+      border-color: #3d9442;
+    }
+    .btn-primary:hover {
+      filter: brightness(1.05);
+    }
+    #statusMsg {
+      margin-top: 10px;
+      font-size: 0.9rem;
+      display: none;
+    }
+    #statusMsg.ok {
+      color: #2e7d32;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h2>Review &amp; Send Job</h2>
+    <p class="sub">
+      Please review all of the data below before we send it to Accuquote!
+      You can edit any of these fields, then click <strong>Send</strong> to confirm.
+    </p>
+
+    <form id="intentForm">
+      <!-- Hidden identifiers -->
+      <input type="hidden" name="project_id" value="{{ project_id }}">
+      <input type="hidden" name="doc_folder" value="{{ doc_folder }}">
+
+      <!-- TOP GRID: job basics + dates -->
+      <div class="grid">
+        <div class="field">
+          <label>Job / Project Name</label>
+          <input type="text" name="project_name" value="{{ project_name }}">
+        </div>
+        <div class="field">
+          <label>Customer Email</label>
+          <input type="email" name="email" value="{{ email }}">
+        </div>
+        <div class="field">
+          <label>Bid Date</label>
+          <!-- matches original form key: meta_bid_date -->
+          <input type="text" name="meta_bid_date" value="{{ meta_bid_date }}">
+        </div>
+        <div class="field">
+          <label>Drawing Date</label>
+          <!-- matches original form key: meta_drawing_date -->
+          <input type="text" name="meta_drawing_date" value="{{ meta_drawing_date }}">
+        </div>
+      </div>
+
+      <!-- ADDRESS / ENGINEER / GC / NOTES (use meta_* names so they can be re-posted as Meta) -->
+      <div class="field">
+        <label>Address</label>
+        <textarea name="meta_address">{{ meta_address }}</textarea>
+      </div>
+
+      <div class="field">
+        <label>Engineer</label>
+        <input type="text" name="meta_engineer" value="{{ meta_engineer }}">
+      </div>
+
+      <div class="field">
+        <label>General Contractor</label>
+        <input type="text" name="meta_general_contractor" value="{{ meta_general_contractor }}">
+      </div>
+
+      <div class="field">
+        <label>Notes</label>
+        <textarea name="meta_notes">{{ meta_notes }}</textarea>
+      </div>
+
+      <!-- AYS + business-specific fields -->
+      <div class="field">
+        <label>AYS ID</label>
+        <input type="text" name="ays_id" value="{{ ays_id }}">
+      </div>
+
+      <div class="field">
+        <label>Manufacturer Terms (only your manufacturers)</label>
+        <textarea name="manufacturer_terms">{{ manufacturer_terms }}</textarea>
+      </div>
+
+      <div class="field">
+        <label>Recommendation</label>
+        <input type="text" name="recommendation" value="{{ recommendation }}">
+      </div>
+
+      <div class="row">
+        <button class="btn btn-secondary" type="button" onclick="onCancel(event)">Cancel</button>
+        <button class="btn btn-primary" type="submit" onclick="onSend(event)">Send</button>
+      </div>
+
+      <div id="statusMsg"></div>
+    </form>
+  </div>
+
+  <script>
+    function onSend(e) {
+      e.preventDefault();
+
+      const msg = document.getElementById('statusMsg');
+      msg.textContent = 'Job Successfully Sent!';
+      msg.className = 'ok';
+      msg.style.display = 'block';
+
+      // In the future, you'd POST this data somewhere here.
+      // The payload will now contain meta_* fields that match your /project-process logic.
+
+      setTimeout(() => {
+        if (window.parent) {
+          window.parent.postMessage({ type: 'ays-intent-sent' }, '*');
+        }
+      }, 3000);
+    }
+
+    function onCancel(e) {
+      e.preventDefault();
+      if (window.parent) {
+        window.parent.postMessage({ type: 'ays-intent-cancel' }, '*');
+      }
+    }
+  </script>
+</body>
+</html>
+
+

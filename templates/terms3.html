@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Search Terms</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    :root{
+      --bg:#f6f6f7;
+      --card:#fff;
+      --text:#111;
+      --muted:#666;
+      --border:#e6e6e6;
+      --accent:#4CAF50;
+      --orange:#ff8c00;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    /* NAVBAR (matches explorer) */
+    .navbar{
+      background:#333;
+      color:#fff;
+      padding:10px;
+      display:flex;
+      gap:16px;
+      align-items:center;
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    .navbar img{ height:36px; }
+    .navbar a, .navbar button{
+      color:#fff;
+      text-decoration:none;
+      opacity:.95;
+      background:none;
+      border:0;
+      cursor:pointer;
+      font-size:1rem;
+    }
+    .navbar a:hover, .navbar button:hover{ text-decoration:underline; }
+    .navbar .spacer{ flex:1; }
+
+    .btn-primary{
+      background:var(--accent);
+      border-radius:8px;
+      padding:6px 10px;
+      border:1px solid rgba(255,255,255,.2);
+    }
+    .btn-primary:hover{ text-decoration:none; filter:brightness(1.05); }
+
+    /* Version pill */
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:.82rem;
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.18);
+      color:#fff;
+      white-space:nowrap;
+      opacity:.95;
+    }
+
+    /* PAGE LAYOUT */
+    .container{
+      max-width: 980px;
+      margin: 16px auto 70px;
+      padding: 0 16px;
+    }
+
+    .page-head{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      padding:14px 16px;
+      margin-top:16px;
+    }
+    .page-title{
+      margin:0;
+      font-size:1.25rem;
+      font-weight:800;
+    }
+    .page-sub{
+      margin:6px 0 0;
+      color:var(--muted);
+      font-size:.92rem;
+    }
+
+    .term-card{
+      margin-top:14px;
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:14px;
+      overflow:hidden;
+    }
+
+    .term-card-head{
+      padding:12px 14px;
+      border-bottom:1px solid var(--border);
+      display:flex;
+      align-items:center;
+      gap:10px;
+      background:#fffaf5;
+    }
+
+    .term-card-head input[type="text"]{
+      width:100%;
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      font-weight:800;
+      font-size:1rem;
+      background:#fff;
+    }
+
+    table{
+      width:100%;
+      border-collapse:collapse;
+      background:#fff;
+    }
+    th, td{
+      border-top:1px solid #eee;
+      padding:10px 12px;
+      text-align:left;
+      vertical-align:middle;
+    }
+    thead th{
+      background:var(--orange);
+      color:#fff;
+      font-weight:800;
+      border-top:none;
+    }
+
+    /* delete button */
+    td form{ display:inline; }
+    .btn-delete{
+      float:right;
+      background:none;
+      border:none;
+      cursor:pointer;
+      padding:4px 6px;
+      border-radius:8px;
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      color:#555;
+    }
+    .btn-delete:hover{
+      background:#f3f3f3;
+    }
+    .btn-delete svg{
+      width:14px;
+      height:14px;
+      fill:#888;
+      vertical-align:middle;
+    }
+
+    /* add term row */
+    .term-add{
+      padding:12px 14px 14px;
+      border-top:1px solid var(--border);
+      background:#fafafa;
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+      align-items:center;
+    }
+    .term-add input[type="text"]{
+      flex:1 1 340px;
+      padding:10px 12px;
+      border:1px solid var(--border);
+      border-radius:10px;
+      background:#fff;
+    }
+    .term-add button{
+      padding:10px 14px;
+      border:0;
+      border-radius:999px;
+      background:var(--accent);
+      color:#fff;
+      cursor:pointer;
+      font-weight:700;
+      box-shadow:0 1px 2px rgba(0,0,0,.08);
+    }
+    .term-add button:hover{ filter:brightness(1.05); }
+
+    .anchorlink{ position:relative; top:-90px; }
+
+    .copyright{
+      position:fixed;
+      bottom:10px;
+      right:10px;
+      font-size:14px;
+      color:#666;
+    }
+
+    /* Dialog (Start Project) */
+    dialog::backdrop { background: rgba(0,0,0,.35); }
+    dialog{
+      border:0;
+      border-radius:14px;
+      padding:0;
+    }
+    .dlg-bar{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:12px;
+      padding:10px 12px;
+      border-bottom:1px solid var(--border);
+      background:#fff;
+      border-top-left-radius:14px;
+      border-top-right-radius:14px;
+    }
+    .dlg-title{ font-weight:800; font-size:1rem; }
+    .close-btn{
+      background:#eee;
+      border:1px solid #ddd;
+      border-radius:8px;
+      padding:6px 10px;
+      cursor:pointer;
+    }
+    .close-btn:hover{ filter:brightness(0.98); }
+    #newProjectFrame{
+      width:min(920px,90vw);
+      height:min(80vh,780px);
+      border:0;
+      display:block;
+    }
+  </style>
+</head>
+
+<!-- optional backend injection for version -->
+<body data-ays-version="{{ ays_version|default('') }}">
+
+  <div class="navbar">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+    <a href="{{ url_for('explorer_page') }}">Dashboard</a>
+    <a href="{{ url_for('terms') }}">Search Terms</a>
+    <a href="{{ url_for('config_page') }}">Forge</a>
+
+
+    <span id="aysVersionPill" class="pill" title="AYS version">AYS v–</span>
+
+    <span class="spacer"></span>
+    <button class="btn-primary" type="button" onclick="openNewProject()">+ Start Project</button>
+  </div>
+
+  <div class="container">
+    <div class="page-head">
+      <h1 class="page-title">Search Terms</h1>
+      <p class="page-sub">
+        Add, remove, and manage keyword lists used by AYS for highlighting and reporting.
+      </p>
+    </div>
+
+    <!-- Manufacturer Terms -->
+    <div class="term-card">
+      <div class="term-card-head">
+        <input type="text"
+               id="manufacturer-table-name"
+               placeholder="Enter Manufacturer Table Name"
+               value="Manufacturer Terms">
+      </div>
+
+      <table>
+        <thead><tr><th>Terms</th></tr></thead>
+        <tbody>
+          {% for term in manufacturer_terms %}
+          <tr>
+            <td>
+              {{ term }}
+              <form method="post" action="{{ url_for('terms') }}">
+                <input type="hidden" name="term_type" value="manufacturer">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="delete_term" value="{{ term }}">
+                <button type="submit" class="btn-delete"
+                        onclick="return confirm('Delete term &quot;{{ term }}&quot;?');">
+                  <svg viewBox="0 0 448 512">
+                    <path d="M135.2 17.7L141.6 0H306.4L312.8 17.7L328 48H120L135.2 17.7zM32 80H416V128H32V80zM64 160H384L354.4 512H93.6L64 160z"/>
+                  </svg>
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div id="manufacturer" class="anchorlink"></div>
+      <div class="term-add">
+        <form method="post" action="{{ url_for('terms') }}" style="display:flex; gap:10px; flex:1; flex-wrap:wrap;">
+          <input type="hidden" name="term_type" value="manufacturer">
+          <input type="hidden" name="action" value="add">
+          <input type="text" name="new_manufacturer_term" placeholder="Add new manufacturer term">
+          <button type="submit">Add Term</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Competitor Terms -->
+    <div class="term-card">
+      <div class="term-card-head">
+        <input type="text"
+               id="competitor-table-name"
+               placeholder="Enter Table Name"
+               value="Competitor Terms">
+      </div>
+
+      <table>
+        <thead><tr><th>Terms</th></tr></thead>
+        <tbody>
+          {% for term in competitor_terms %}
+          <tr>
+            <td>
+              {{ term }}
+              <form method="post" action="{{ url_for('terms') }}">
+                <input type="hidden" name="term_type" value="competitor">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="delete_term" value="{{ term }}">
+                <button type="submit" class="btn-delete"
+                        onclick="return confirm('Delete term &quot;{{ term }}&quot;?');">
+                  <svg viewBox="0 0 448 512">
+                    <path d="M135.2 17.7L141.6 0H306.4L312.8 17.7L328 48H120L135.2 17.7zM32 80H416V128H32V80zM64 160H384L354.4 512H93.6L64 160z"/>
+                  </svg>
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div id="competitor" class="anchorlink"></div>
+      <div class="term-add">
+        <form method="post" action="{{ url_for('terms') }}" style="display:flex; gap:10px; flex:1; flex-wrap:wrap;">
+          <input type="hidden" name="term_type" value="competitor">
+          <input type="hidden" name="action" value="add">
+          <input type="text" name="new_competitor_term" placeholder="Add new competitor">
+          <button type="submit">Add Term</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Equipment Terms -->
+    <div class="term-card">
+      <div class="term-card-head">
+        <input type="text"
+               id="equipment-table-name"
+               placeholder="Enter Table Name"
+               value="Equipment Terms">
+      </div>
+
+      <table>
+        <thead><tr><th>Terms</th></tr></thead>
+        <tbody>
+          {% for term in equipment_terms %}
+          <tr>
+            <td>
+              {{ term }}
+              <form method="post" action="{{ url_for('terms') }}">
+                <input type="hidden" name="term_type" value="equipment">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="delete_term" value="{{ term }}">
+                <button type="submit" class="btn-delete"
+                        onclick="return confirm('Delete term &quot;{{ term }}&quot;?');">
+                  <svg viewBox="0 0 448 512">
+                    <path d="M135.2 17.7L141.6 0H306.4L312.8 17.7L328 48H120L135.2 17.7zM32 80H416V128H32V80zM64 160H384L354.4 512H93.6L64 160z"/>
+                  </svg>
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div id="equipment" class="anchorlink"></div>
+      <div class="term-add">
+        <form method="post" action="{{ url_for('terms') }}" style="display:flex; gap:10px; flex:1; flex-wrap:wrap;">
+          <input type="hidden" name="term_type" value="equipment">
+          <input type="hidden" name="action" value="add">
+          <input type="text" name="new_equipment_term" placeholder="Add new equipment term">
+          <button type="submit">Add Term</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Model Terms -->
+    <div class="term-card">
+      <div class="term-card-head">
+        <input type="text"
+               id="model-table-name"
+               placeholder="Enter Table Name"
+               value="Model Terms">
+      </div>
+
+      <table>
+        <thead><tr><th>Terms</th></tr></thead>
+        <tbody>
+          {% for term in model_terms %}
+          <tr>
+            <td>
+              {{ term }}
+              <form method="post" action="{{ url_for('terms') }}">
+                <input type="hidden" name="term_type" value="model">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="delete_term" value="{{ term }}">
+                <button type="submit" class="btn-delete"
+                        onclick="return confirm('Delete term &quot;{{ term }}&quot;?');">
+                  <svg viewBox="0 0 448 512">
+                    <path d="M135.2 17.7L141.6 0H306.4L312.8 17.7L328 48H120L135.2 17.7zM32 80H416V128H32V80zM64 160H384L354.4 512H93.6L64 160z"/>
+                  </svg>
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div id="model" class="anchorlink"></div>
+      <div class="term-add">
+        <form method="post" action="{{ url_for('terms') }}" style="display:flex; gap:10px; flex:1; flex-wrap:wrap;">
+          <input type="hidden" name="term_type" value="model">
+          <input type="hidden" name="action" value="add">
+          <input type="text" name="new_model_term" placeholder="Add new model term">
+          <button type="submit">Add Term</button>
+        </form>
+      </div>
+    </div>
+
+    <!-- Universal Terms -->
+    <div class="term-card">
+      <div class="term-card-head">
+        <input type="text"
+               id="universal-table-name"
+               placeholder="Enter Table Name"
+               value="Universal Terms">
+      </div>
+
+      <table>
+        <thead><tr><th>Terms</th></tr></thead>
+        <tbody>
+          {% for term in universal_terms %}
+          <tr>
+            <td>
+              {{ term }}
+              <form method="post" action="{{ url_for('terms') }}">
+                <input type="hidden" name="term_type" value="universal">
+                <input type="hidden" name="action" value="delete">
+                <input type="hidden" name="delete_term" value="{{ term }}">
+                <button type="submit" class="btn-delete"
+                        onclick="return confirm('Delete term &quot;{{ term }}&quot;?');">
+                  <svg viewBox="0 0 448 512">
+                    <path d="M135.2 17.7L141.6 0H306.4L312.8 17.7L328 48H120L135.2 17.7zM32 80H416V128H32V80zM64 160H384L354.4 512H93.6L64 160z"/>
+                  </svg>
+                  Delete
+                </button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+
+      <div id="universal" class="anchorlink"></div>
+      <div class="term-add">
+        <form method="post" action="{{ url_for('terms') }}" style="display:flex; gap:10px; flex:1; flex-wrap:wrap;">
+          <input type="hidden" name="term_type" value="universal">
+          <input type="hidden" name="action" value="add">
+          <input type="text" name="new_universal_term" placeholder="Add new universal term">
+          <button type="submit">Add Term</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="copyright">
+    &copy; 2024 AccuQuote, LLC.
+  </div>
+
+  <!-- Start Project dialog (matches explorer pattern) -->
+  <dialog id="newProjectDlg" data-upload-url="{{ url_for('start_project', embed=1) }}">
+    <div class="dlg-bar">
+      <div class="dlg-title">Start Project</div>
+      <button type="button" class="close-btn" onclick="closeNewProject()">Close</button>
+    </div>
+    <iframe id="newProjectFrame" title="Start Project"></iframe>
+    <noscript>
+      <a href="{{ url_for('start_project', embed=1) }}" target="_blank" rel="noopener">
+        Open Start Project
+      </a>
+    </noscript>
+  </dialog>
+
+  <script>
+    // ----------------------------
+    // Keep your existing table-name localStorage behavior
+    // ----------------------------
+    function saveTableName(tableId) {
+      const inputField = document.getElementById(tableId);
+      const tableName = inputField.value;
+      localStorage.setItem(tableId, tableName);
+    }
+
+    function loadTableNames() {
+      const tableIds = [
+        'manufacturer-table-name',
+        'competitor-table-name',
+        'equipment-table-name',
+        'model-table-name',
+        'universal-table-name'
+      ];
+
+      tableIds.forEach((tableId) => {
+        const savedName = localStorage.getItem(tableId);
+        if (savedName) {
+          document.getElementById(tableId).value = savedName;
+        }
+
+        document.getElementById(tableId).addEventListener('input', function () {
+          saveTableName(tableId);
+        });
+      });
+    }
+
+    // ----------------------------
+    // Version pill (same as explorer)
+    // ----------------------------
+    const aysVersionPill = document.getElementById('aysVersionPill');
+
+    async function loadAysVersion() {
+      try {
+        const r = await fetch('/api/version', { cache: 'no-store' });
+        if (r.ok) {
+          const data = await r.json().catch(() => ({}));
+          const v = data.version || data.ays_version || data.app_version || '';
+          if (v) {
+            aysVersionPill.textContent = `AYS v${v}`;
+            aysVersionPill.title = `AYS version ${v}`;
+            return;
+          }
+        }
+      } catch (e) {}
+
+      const bodyV = (document.body && document.body.dataset && document.body.dataset.aysVersion) ? document.body.dataset.aysVersion : '';
+      if (bodyV) {
+        aysVersionPill.textContent = `AYS v${bodyV}`;
+        aysVersionPill.title = `AYS version ${bodyV}`;
+        return;
+      }
+
+      aysVersionPill.textContent = 'AYS v–';
+      aysVersionPill.title = 'AYS version';
+    }
+
+    // ----------------------------
+    // Start Project dialog (same UX)
+    // ----------------------------
+    const newProjDlg = document.getElementById('newProjectDlg');
+    const newProjFrame = document.getElementById('newProjectFrame');
+
+    function openNewProject(){
+      const url = newProjDlg.dataset.uploadUrl;
+      newProjFrame.src = url;
+      newProjDlg.showModal();
+    }
+
+    function closeNewProject(){
+      if (newProjDlg.open) newProjDlg.close();
+    }
+
+    newProjDlg.addEventListener('click', (e) => {
+      const rect = newProjFrame.getBoundingClientRect();
+      const inside =
+        e.clientX >= rect.left && e.clientX <= rect.right &&
+        e.clientY >= rect.top  && e.clientY <= rect.bottom;
+      if (!inside) newProjDlg.close();
+    });
+
+    // init
+    window.onload = () => {
+      loadTableNames();
+      loadAysVersion();
+    };
+  </script>
+
+</body>
+</html>
+
+
+
+
+
