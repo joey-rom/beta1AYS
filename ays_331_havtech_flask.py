@@ -130,7 +130,7 @@ def login():
     """
     Login page route for user authentication.
     """
-    users = {'romays': 'betatwo', 'login': 'betatwobetatwo'}
+    users = {'havays': 'vT7!qL3#Zp2@Nw8$', 'aysadmin': 'H9^mR4!xK2@dS7&c'}
     if request.method == 'POST':
         username = request.form['username']
         password = request.form['password']
