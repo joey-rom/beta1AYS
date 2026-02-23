@@ -122,7 +122,7 @@ equipment_terms, manufacturer_terms, model_terms, universal_terms, competitor_te
 
 processing_cancelled = threading.Event()
 
-users = {'havays': 'vT7!qL3#Zp2@Nw8$', 'login': 'H9^mR4!xK2@dS7&c'}
+users = {'havays': 'vT7!qL3#Zp2@Nw8$', 'aysadmin': 'H9^mR4!xK2@dS7&c'}
 
 # Login page route
 @app.route('/', methods=['GET', 'POST'])
