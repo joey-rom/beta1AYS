@@ -43,7 +43,7 @@ highlight_colors = {}
 last_valid_section_name = 'Unknown'
 last_valid_section_id = 'Unknown'
 
-def load_search_terms(filepath="terms/UEP_Terms.json"):
+def load_search_terms(filepath="terms/havtech_Terms.json"):
     global search_terms, highlight_colors
     try:
         with open(filepath, 'r') as f:

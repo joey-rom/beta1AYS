@@ -248,7 +248,7 @@ def nginx_config():
 
 @app.route('/terms', methods=['GET', 'POST'])
 def terms():
-    filepath = 'terms/UEP_Terms.json'
+    filepath = 'terms/havtech_Terms.json'
 
     # Load existing terms from the JSON file
     try:
