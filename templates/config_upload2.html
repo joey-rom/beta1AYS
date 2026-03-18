@@ -1,0 +1,474 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Forge – Config Import</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <style>
+    :root{
+      --bg:#f6f6f7;
+      --card:#fff;
+      --text:#111;
+      --muted:#666;
+      --border:#e6e6e6;
+      --accent:#4CAF50;
+      --orange:#ff8c00;
+    }
+
+    *{ box-sizing:border-box; }
+    body{
+      margin:0;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+      background:var(--bg);
+      color:var(--text);
+    }
+
+    /* NAVBAR */
+    .navbar{
+      background:#333;
+      color:#fff;
+      padding:8px 14px;
+      display:flex;
+      align-items:center;
+      gap:12px;
+      position:sticky;
+      top:0;
+      z-index:10;
+    }
+    .navbar img{ height:42px; }
+
+    .nav-group{ position:relative; }
+    .nav-button{
+      border:0;
+      background:none;
+      color:#fff;
+      font-size:0.95rem;
+      padding:8px 12px;
+      border-radius:999px;
+      display:flex;
+      align-items:center;
+      gap:6px;
+      cursor:pointer;
+      opacity:.95;
+      white-space:nowrap;
+    }
+    .nav-button:hover{
+      background:rgba(255,255,255,.10);
+      opacity:1;
+    }
+    .dropdown-menu{
+      position:absolute;
+      top:100%;
+      left:0;
+      min-width:160px;
+      margin-top:4px;
+      background:#222;
+      border-radius:10px;
+      border:1px solid rgba(255,255,255,.15);
+      box-shadow:0 6px 18px rgba(0,0,0,.35);
+      padding:4px 0;
+      display:none;
+      z-index:100;
+    }
+    .nav-group.open .dropdown-menu{ display:block; }
+    .dropdown-item{
+      display:block;
+      padding:8px 14px;
+      font-size:0.9rem;
+      color:#fff;
+      text-decoration:none;
+      white-space:nowrap;
+    }
+    .dropdown-item:hover{ background:rgba(255,255,255,.12); }
+
+    .navbar .spacer{ flex:1; }
+    .pill{
+      display:inline-flex;
+      align-items:center;
+      gap:6px;
+      padding:6px 10px;
+      border-radius:999px;
+      font-size:.82rem;
+      background:rgba(255,255,255,.12);
+      border:1px solid rgba(255,255,255,.18);
+      color:#fff;
+      white-space:nowrap;
+      opacity:.95;
+    }
+
+    /* PAGE */
+    .container{
+      max-width:720px;
+      margin:18px auto 80px;
+      padding:0 16px;
+    }
+    .card{
+      background:var(--card);
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:18px 20px;
+    }
+    h1{
+      margin:0;
+      font-size:1.35rem;
+      font-weight:800;
+    }
+    .sub{
+      margin:6px 0 16px;
+      color:var(--muted);
+      font-size:.95rem;
+    }
+    label{
+      display:block;
+      font-weight:700;
+      margin:14px 0 6px;
+    }
+    input[type="text"],
+    input[type="file"],
+    select{
+      width:100%;
+      padding:10px 12px;
+      border-radius:10px;
+      border:1px solid var(--border);
+      font-size:1rem;
+      background:#fff;
+    }
+    input[type="file"]{ padding:8px; }
+
+    .btn{
+      margin-top:20px;
+      padding:12px 16px;
+      border-radius:999px;
+      border:0;
+      background:var(--accent);
+      color:#fff;
+      font-weight:800;
+      font-size:1rem;
+      cursor:pointer;
+      box-shadow:0 1px 2px rgba(0,0,0,.1);
+    }
+    .btn:disabled{
+      background:#bbb;
+      cursor:not-allowed;
+      box-shadow:none;
+    }
+    .note{
+      margin-top:14px;
+      font-size:.85rem;
+      color:var(--muted);
+    }
+    .copyright{
+      position:fixed;
+      bottom:10px;
+      right:10px;
+      font-size:14px;
+      color:#666;
+    }
+
+    select option:disabled {
+      color: #bbb;
+    }
+  </style>
+</head>
+
+<body data-ays-version="{{ ays_version|default('') }}">
+
+  <!-- NAVBAR -->
+  <div class="navbar">
+    <img src="{{ url_for('static', filename='logo.png') }}" alt="Logo">
+
+    <div class="nav-group">
+      <button class="nav-button" type="button">
+        AreYouSpecified
+        <span style="font-size:0.75rem;">▼</span>
+      </button>
+      <div class="dropdown-menu">
+        <a class="dropdown-item" href="{{ url_for('explorer_page') }}">Dashboard</a>
+        <a class="dropdown-item" href="{{ url_for('terms') }}">Terms</a>
+      </div>
+    </div>
+
+    <div class="nav-group">
+      <button class="nav-button" type="button">
+        Transformer
+        <span style="font-size:0.75rem;">▼</span>
+      </button>
+      <div class="dropdown-menu">
+        <a class="dropdown-item" href="{{ url_for('config_page') }}">Transformer</a>
+      </div>
+    </div>
+
+    <span class="spacer"></span>
+
+    <span id="aysVersionPill" class="pill">
+      AYS v{{ ays_version|default('–') }}
+    </span>
+  </div>
+
+  <!-- PAGE -->
+  <div class="container">
+    <div class="card">
+      <h1>Configuration Import</h1>
+      <p class="sub">
+        Upload a manufacturer configuration PDF and generate an AccuQuote-ready template.
+      </p>
+
+      <form method="post"
+            action="{{ url_for('config_run') }}"
+            enctype="multipart/form-data">
+
+        <label for="job_name">Job Name</label>
+        <input type="text"
+               id="job_name"
+               name="job_name"
+               placeholder="Example: McCook High School"
+               required>
+
+        <label for="manufacturer">Manufacturer</label>
+        <select id="manufacturer" name="manufacturer" required>
+          <option value="">— Select Manufacturer —</option>
+        </select>
+
+        <label for="output_type">Output Type</label>
+        <select id="output_type" name="output_type" required>
+          <option value="">— Select Output Type —</option>
+        </select>
+
+        <label for="pdf_file">Configuration File</label>
+        <input type="file"
+               id="pdf_file"
+               name="pdf_file"
+               accept=".pdf,.doc,.docx,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+               required>
+
+        <button type="submit" class="btn">
+          Generate Template
+        </button>
+
+      </form>
+
+    </div>
+  </div>
+
+  <div class="copyright">
+    &copy; 2024 AccuQuote, LLC.
+  </div>
+
+<script>
+
+  // ============================================================
+  // ✏️  CAPABILITY CONFIG — edit this when you add new scripts
+  //
+  // For each manufacturer, set which output types are ready.
+  // Set to true  = enabled (shows as a normal selectable option)
+  // Set to false = coming soon (shows greyed out, not selectable)
+  // ============================================================
+  const MANUFACTURER_CAPABILITIES = {
+    'KCC':        { all_in_one: true,  shopping_list: false },
+    'Valent':     { all_in_one: true,  shopping_list: false },
+    'Innovent':   { all_in_one: true,  shopping_list: false },
+    'Multistack': { all_in_one: true,  shopping_list: false },
+    'AAON':       { all_in_one: true,  shopping_list: false },
+    'Superior':   { all_in_one: false,  shopping_list: true },
+    'Weishaupt':  { all_in_one: false,  shopping_list: true },
+    'BAC':        { all_in_one: false, shopping_list: false },
+    'Daikin':     { all_in_one: true, shopping_list: true },
+  };
+
+  // ✏️  OUTPUT TYPE LABELS — edit display names here if needed
+  const OUTPUT_TYPE_LABELS = {
+    all_in_one:    'All-in-One Template',
+    shopping_list: 'Shopping List',
+  };
+
+  // ✏️  FILE TYPE RESTRICTIONS per manufacturer
+  // 'pdf'  = PDF only
+  // 'word' = .doc/.docx only
+  // 'any'  = PDF or Word
+  const MANUFACTURER_FILE_TYPES = {
+    'KCC':        'pdf',
+    'Valent':     'pdf',
+    'Innovent':   'word',
+    'Multistack': 'pdf',
+    'AAON':       'pdf',
+    'Superior':   'any',
+    'Weishaupt':  'pdf',
+    'BAC':        'pdf',
+    'Daikin':     'word',
+  };
+  // ============================================================
+  // END CONFIG — no need to edit below this line
+  // ============================================================
+
+
+  const mfrSelect    = document.getElementById('manufacturer');
+  const outputSelect = document.getElementById('output_type');
+
+  // Populate manufacturer dropdown from config
+  function buildManufacturerDropdown() {
+    for (const [name, caps] of Object.entries(MANUFACTURER_CAPABILITIES)) {
+      const anyEnabled = Object.values(caps).some(v => v === true);
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = anyEnabled ? name : `${name} (coming soon)`;
+      opt.disabled = !anyEnabled;
+      mfrSelect.appendChild(opt);
+    }
+  }
+
+  // Rebuild output type dropdown based on selected manufacturer
+  function updateOutputTypes() {
+    const selected = mfrSelect.value;
+    outputSelect.innerHTML = '<option value="">— Select Output Type —</option>';
+
+    if (!selected || !MANUFACTURER_CAPABILITIES[selected]) return;
+
+    const caps = MANUFACTURER_CAPABILITIES[selected];
+    for (const [key, enabled] of Object.entries(caps)) {
+      const label = OUTPUT_TYPE_LABELS[key] || key;
+      const opt = document.createElement('option');
+      opt.value = key;
+      opt.textContent = enabled ? label : `${label} (coming soon)`;
+      opt.disabled = !enabled;
+      outputSelect.appendChild(opt);
+    }
+
+    // Auto-select if only one option is enabled
+    const enabledOptions = [...outputSelect.options].filter(o => !o.disabled && o.value);
+    if (enabledOptions.length === 1) {
+      outputSelect.value = enabledOptions[0].value;
+    }
+  }
+
+  mfrSelect.addEventListener('change', updateOutputTypes);
+
+
+  // ============================
+  // AYS Version Pill
+  // ============================
+  const pill = document.getElementById('aysVersionPill');
+
+  async function loadAysVersion() {
+    try {
+      const r = await fetch('/api/version', { cache: 'no-store' });
+      if (r.ok) {
+        const d = await r.json().catch(() => ({}));
+        const v = d.version || d.ays_version || d.app_version || '';
+        if (v) {
+          pill.textContent = `AYS v${v}`;
+          pill.title = `AYS version ${v}`;
+          return;
+        }
+      }
+    } catch (e) {}
+
+    const fallback = document.body?.dataset?.aysVersion || '';
+    pill.textContent = fallback ? `AYS v${fallback}` : 'AYS v–';
+    pill.title = 'AYS version';
+  }
+
+
+  // ============================
+  // Config Form Guard
+  // ============================
+  function initConfigFormGuard() {
+    const form = document.querySelector('form[action*="config_run"]');
+    if (!form) return;
+
+    form.addEventListener('submit', function (e) {
+      const manufacturer = (mfrSelect?.value || '');
+      const jobName = document.getElementById('job_name')?.value || '';
+      const fileInput = document.getElementById('pdf_file');
+      const outputType = outputSelect?.value || '';
+
+      if (!jobName.trim()) {
+        e.preventDefault();
+        alert('Please enter a Job Name.');
+        return;
+      }
+
+      if (!manufacturer) {
+        e.preventDefault();
+        alert('Please select a manufacturer.');
+        return;
+      }
+
+      if (!outputType) {
+        e.preventDefault();
+        alert('Please select an output type.');
+        return;
+      }
+
+      if (!fileInput || !fileInput.files || fileInput.files.length === 0) {
+        e.preventDefault();
+        alert('Please upload a configuration file.');
+        return;
+      }
+
+      const file = fileInput.files[0];
+      const fname = (file.name || '').toLowerCase();
+      const fileType = MANUFACTURER_FILE_TYPES[manufacturer] || 'any';
+
+      if (fileType === 'pdf') {
+        if (!fname.endsWith('.pdf')) {
+          e.preventDefault();
+          alert(`${manufacturer} upload must be a PDF.`);
+          return;
+        }
+      } else if (fileType === 'word') {
+        if (!(fname.endsWith('.doc') || fname.endsWith('.docx'))) {
+          e.preventDefault();
+          alert(`${manufacturer} upload must be a Word document (.doc or .docx).`);
+          return;
+        }
+      } else {
+        if (!(fname.endsWith('.pdf') || fname.endsWith('.doc') || fname.endsWith('.docx'))) {
+          e.preventDefault();
+          alert('Upload must be .pdf, .doc, or .docx.');
+          return;
+        }
+      }
+
+      const btn = form.querySelector('button[type="submit"]');
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = 'Generating…';
+      }
+    });
+  }
+
+
+  // ============================
+  // Navbar dropdown hover
+  // ============================
+  function initNavDropdownHover() {
+    const groups = document.querySelectorAll('.nav-group');
+    if (!groups.length) return;
+
+    groups.forEach(group => {
+      let hideTimer = null;
+
+      group.addEventListener('mouseenter', () => {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        group.classList.add('open');
+      });
+
+      group.addEventListener('mouseleave', () => {
+        hideTimer = setTimeout(() => { group.classList.remove('open'); }, 350);
+      });
+    });
+  }
+
+  window.addEventListener('DOMContentLoaded', () => {
+    buildManufacturerDropdown();
+    loadAysVersion();
+    initConfigFormGuard();
+    initNavDropdownHover();
+  });
+</script>
+
+</body>
+</html>
+
+

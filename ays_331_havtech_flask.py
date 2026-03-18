@@ -2136,14 +2136,19 @@ def api_version():
 # CONFIG UPLOAD + ROUTER
 # =========================
 
-from io import BytesIO
+from io import BytesIO, StringIO
+import csv
 from flask import request, send_file, Response, render_template, flash, redirect, url_for
+import openpyxl
 
 from parsers.kcc_parser1 import convert_kcc_pdf_to_xlsx_bytes
 from parsers.valent_parser1 import convert_valent_pdf_to_xlsx_bytes
 from parsers.innovent_parser2 import convert_innovent_pdf_to_xlsx_bytes
 from parsers.multistack_parser1 import convert_multistack_pdf_to_xlsx_bytes
 from parsers.aaon_parser1 import convert_aaon_pdf_to_xlsx_bytes
+from parsers.superior_parser1 import convert_superior_to_xlsx_bytes
+from parsers.weishaupt_parser1 import convert_weishaupt_to_xlsx_bytes
+from parsers.daikin_parser import convert_daikin_to_xlsx_bytes
 
 CONFIG_CONVERTERS = {
     "kcc": convert_kcc_pdf_to_xlsx_bytes,
@@ -2151,13 +2156,28 @@ CONFIG_CONVERTERS = {
     "innovent": convert_innovent_pdf_to_xlsx_bytes,
     "multistack": convert_multistack_pdf_to_xlsx_bytes,
     "aaon": convert_aaon_pdf_to_xlsx_bytes,
-    # "trane": convert_trane_pdf_to_xlsx_bytes,
-    # "aaon": convert_aaon_pdf_to_xlsx_bytes,
+    "superior": convert_superior_to_xlsx_bytes,
+    "weishaupt": convert_weishaupt_to_xlsx_bytes,
+    "daikin": convert_daikin_to_xlsx_bytes,
 }
+
+
+def _xlsx_bytes_to_csv(xlsx_bytes: bytes) -> bytes:
+    """Convert the first sheet of an xlsx workbook to CSV bytes."""
+    wb = openpyxl.load_workbook(BytesIO(xlsx_bytes), data_only=True)
+    ws = wb.active
+
+    buf = StringIO()
+    writer = csv.writer(buf)
+    for row in ws.iter_rows(values_only=True):
+        writer.writerow(['' if v is None else v for v in row])
+
+    return buf.getvalue().encode('utf-8')
+
 
 @app.route("/config", methods=["GET"])
 def config_page():
-    return render_template("config_upload1.html")
+    return render_template("config_upload2.html")
 
 
 @app.route("/config", methods=["POST"])
@@ -2165,11 +2185,10 @@ def config_router():
     manufacturer = (request.form.get("manufacturer") or "").strip().lower()
 
     if manufacturer in CONFIG_CONVERTERS:
-        return config_run()  # ✅ CALL DIRECTLY (no redirect)
+        return config_run()
 
     flash(f"'{manufacturer or 'unknown'}' is not implemented yet.", "error")
     return redirect(url_for("config_page"))
-
 
 
 @app.route("/config/run", methods=["POST"])
@@ -2186,17 +2205,14 @@ def config_run():
     )
 
     try:
-        job_name = (request.form.get("job_name") or "").strip()
+        job_name     = (request.form.get("job_name") or "").strip()
         manufacturer = (request.form.get("manufacturer") or "").strip().lower()
-        output_type = (request.form.get("output_type") or "all_in_one").strip().lower()
-        pdf = request.files.get("pdf_file")
+        output_type  = (request.form.get("output_type") or "all_in_one").strip().lower()
+        pdf          = request.files.get("pdf_file")
 
         app.logger.info(
             "CONFIG/RUN parsed job_name=%r manufacturer=%r output_type=%r pdf=%s",
-            job_name,
-            manufacturer,
-            output_type,
-            getattr(pdf, "filename", None)
+            job_name, manufacturer, output_type, getattr(pdf, "filename", None)
         )
 
         if manufacturer not in CONFIG_CONVERTERS:
@@ -2215,8 +2231,8 @@ def config_run():
         app.logger.info("CONFIG/RUN read pdf bytes=%d", len(pdf_bytes))
 
         converter_fn = CONFIG_CONVERTERS[manufacturer]
-
         app.logger.info("CONFIG/RUN calling converter=%s...", getattr(converter_fn, "__name__", str(converter_fn)))
+
         xlsx_bytes, filename_from_func = converter_fn(
             pdf_bytes=pdf_bytes,
             job_name=job_name,
@@ -2228,25 +2244,23 @@ def config_run():
 
         app.logger.info(
             "CONFIG/RUN convert returned bytes=%d filename=%s",
-            len(xlsx_bytes),
-            filename_from_func
+            len(xlsx_bytes), filename_from_func
         )
 
-        out = BytesIO(xlsx_bytes)
-        out.seek(0)
+        # Convert xlsx → csv
+        csv_bytes = _xlsx_bytes_to_csv(xlsx_bytes)
 
-        # Safe download name
         safe_job = "".join(c for c in job_name if c.isalnum() or c in (" ", "-", "_")).strip() or "job"
-        filename = f"{safe_job}_{manufacturer}_{output_type}_template_output.xlsx".replace(" ", "_")
+        filename = f"{safe_job}_{manufacturer}_{output_type}_template_output.csv".replace(" ", "_")
+
+        out = BytesIO(csv_bytes)
+        out.seek(0)
 
         resp = send_file(
             out,
             as_attachment=True,
             download_name=filename,
-            mimetype=(
-                "application/vnd.openxmlformats-officedocument."
-                "spreadsheetml.sheet"
-            ),
+            mimetype="text/csv",
             max_age=0
         )
         resp.headers["Cache-Control"] = "no-store"
