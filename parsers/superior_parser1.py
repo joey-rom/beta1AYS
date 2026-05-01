@@ -342,14 +342,25 @@ def _build_parsed(all_items: list[dict[str, Any]], header: dict[str, Any]) -> di
 
     options = [
         {
-            "part_number": it["part_number"],
-            "desc": it["description"],
-            "qty": it["qty"],
-            "unit_price": it["unit_price"],
-            "total_price": it["total_price"],
-            "tag": it["item_id"],
-        }
-        for it in include_items
+            "part_number": main["part_number"],
+            "desc": main["description"],
+            "qty": main["qty"],
+            "unit_price": main["unit_price"],
+            "total_price": main["total_price"],
+            "tag": main["item_id"],
+            "feature": "Equipment",
+        },
+        *[
+            {
+                "part_number": it["part_number"],
+                "desc": it["description"],
+                "qty": it["qty"],
+                "unit_price": it["unit_price"],
+                "total_price": it["total_price"],
+                "tag": it["item_id"],
+            }
+            for it in include_items
+        ],
     ]
 
     full_desc = main["description"]
@@ -469,7 +480,7 @@ def _write_one_sheet(
 
         ws.cell(row=row_idx, column=3,  value=tag)
         ws.cell(row=row_idx, column=4,  value=part_num)
-        ws.cell(row=row_idx, column=5,  value="Include")
+        ws.cell(row=row_idx, column=5,  value=opt.get("feature", "Include"))
         ws.cell(row=row_idx, column=6,  value=desc)
         ws.cell(row=row_idx, column=7,  value=opt_qty)
         ws.cell(row=row_idx, column=8,  value=unit_price)
